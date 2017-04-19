@@ -1,4 +1,12 @@
-include $(top_srcdir)/Rules-cpp.mak
+AM_CPPFLAGS = \
+	@PYTHON_CPPFLAGS@ \
+	-include Python.h
+
+AM_CXXFLAGS = \
+	-Wall \
+	-fno-exceptions \
+	@ENIGMA2_CFLAGS@ \
+	@PTHREAD_CFLAGS@
 
 plugindir = $(libdir)/enigma2/python/Plugins/Extensions/Partnerbox
 
@@ -9,4 +17,6 @@ servicewebts_la_SOURCES = \
 	servicewebts.h
 
 servicewebts_la_LDFLAGS = \
-	$(PLUGIN_LIBTOOL_FLAGS)
+	-avoid-version \
+	-module \
+	-shared

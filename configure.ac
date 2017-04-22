@@ -21,6 +21,5 @@ Makefile
 meta/Makefile
 src/Makefile
 src/icons/Makefile
-src/servicewebts/Makefile
 ])
 AC_OUTPUT

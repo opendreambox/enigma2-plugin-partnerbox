@@ -4,7 +4,7 @@
 #  $Id$
 #
 #  Coded by Dr.Best (c) 2009
-#  Support: www.dreambox-tools.info
+#  Support: board.dreambox-tools.info
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -42,14 +42,11 @@ from time import localtime
 import time
 import xml.etree.cElementTree
 import urllib
-import SocketServer
-import servicewebts
-ENIGMA_WEBSERVICE_ID = 0x1012
 from Screens.InfoBarGenerics import InfoBarAudioSelection
 from RemoteTimerEntry import RemoteTimerEntry, RemoteTimerInit
 from PartnerboxEPGSelection import Partnerbox_EPGSelectionInit
 
-from PartnerboxFunctions import PlaylistEntry, FillE1TimerList, E2Timer, FillE2TimerList, SetPartnerboxTimerlist, sendPartnerBoxWebCommand, isInTimerList
+from PartnerboxFunctions import PlaylistEntry, E2Timer, FillE2TimerList, sendPartnerBoxWebCommand, SetPartnerboxTimerlist, isInTimerList
 
 from PartnerboxEPGList import Partnerbox_EPGListInit
 from PartnerboxSetup import PartnerboxSetup, PartnerboxEntriesListConfigScreen, PartnerboxEntryList, PartnerboxEntryConfigScreen, initPartnerboxEntryConfig, initConfig
@@ -65,8 +62,6 @@ from Components.GUIComponent import GUIComponent
 from skin import TemplatedListFonts, componentSizes
 
 config.plugins.Partnerbox = ConfigSubsection()
-config.plugins.Partnerbox.showremotetvinextensionsmenu= ConfigYesNo(default = True)
-config.plugins.Partnerbox.showcurrentstreaminextensionsmenu= ConfigYesNo(default = True)
 config.plugins.Partnerbox.showremotetimerinextensionsmenu= ConfigYesNo(default = True)
 config.plugins.Partnerbox.enablepartnerboxintimerevent = ConfigYesNo(default = False)
 config.plugins.Partnerbox.enablepartnerboxepglist = ConfigYesNo(default = False)
@@ -89,11 +84,7 @@ def partnerboxpluginStart(session, what):
 def partnerboxplugin(session, what, partnerboxentry = None):
 	if partnerboxentry is None:
 		return
-	if what == 0: # Current RemoteTV
-		session.open(CurrentRemoteTV, partnerboxentry)
-	elif what == 1: # RemoteTV
-		session.open(RemoteTimerBouquetList, [], partnerboxentry, 1)
-	elif what == 2: # RemoteTimer
+	if what == 2: # RemoteTimer
 		session.open(RemoteTimer, partnerboxentry)
 
 def autostart_RemoteTimerInit(reason, **kwargs):
@@ -117,13 +108,6 @@ def PartnerboxSetupFinished(session, result):
 def setup(session,**kwargs):
 	session.openWithCallback(PartnerboxSetupFinished, PartnerboxSetup)
 
-
-def currentremotetv(session,**kwargs):
-	partnerboxpluginStart(session, 0)
-
-def remotetvplayer(session,**kwargs):
-	partnerboxpluginStart(session, 1)
-
 def main(session,**kwargs):
 	partnerboxpluginStart(session, 2)
 
@@ -143,10 +127,6 @@ def Plugins(**kwargs):
 	if config.plugins.Partnerbox.showremotetimerinextensionsmenu.value:
 		list.append(PluginDescriptor(name="Partnerbox: RemoteTimer", description=_("Manage timer for other dreamboxes in network"), 
 		where = [PluginDescriptor.WHERE_EXTENSIONSMENU], fnc=main))
-	if config.plugins.Partnerbox.showremotetvinextensionsmenu.value:
-		list.append(PluginDescriptor(name="Partnerbox: RemoteTV Player", description=_("Stream TV from your Partnerbox"), where = [PluginDescriptor.WHERE_EXTENSIONSMENU], fnc=remotetvplayer))
-	if config.plugins.Partnerbox.showcurrentstreaminextensionsmenu.value:
-		list.append(PluginDescriptor(name="Stream current Service from Partnerbox", description=_("Stream current service from partnerbox"), where = [PluginDescriptor.WHERE_EXTENSIONSMENU], fnc=currentremotetv))
 	
 	return list
 			
@@ -161,63 +141,6 @@ def FillLocationList(xmlstring):
 	return Locations
 		
 	
-class CurrentRemoteTV(Screen):
-	skin = """
-		<screen name="CurrentRemoteTV" position="center,center" size="300,240" title="Remote Player">
-		<widget name="text" position="10,10" zPosition="1" size="290,225" font="Regular;20" halign="center" valign="center" />
-	</screen>"""
-	def __init__(self, session, partnerboxentry):
-		self.session = session
-		Screen.__init__(self, session)
-		self.CurrentService = self.session.nav.getCurrentlyPlayingServiceReference()
-		self.PartnerboxEntry = partnerboxentry
-		self.password = partnerboxentry.password.value
-		self.username = "root"
-		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-		port = partnerboxentry.port.value
-		self.http = "http://%s:%d" % (self.ip,port)
-		self.enigma_type = int(partnerboxentry.enigma.value)
-		self.useinternal = int(partnerboxentry.useinternal.value)
-		if self.enigma_type == 1:
-			self.url = self.http + "/video.m3u"
-		else:
-			self.url = self.http + "/web/getcurrent"
-			
-		tt = "Starting Remote Player (IP = %s)" % (self.ip)
-		self["text"] = Label(tt)
-		self.onLayoutFinish.append(self.startRun)
-	
-	def startRun(self):
-		sendPartnerBoxWebCommand(self.url, None,10, self.username, self.password).addCallback(self.Callback).addErrback(self.Error)
-
-	def Callback(self, xmlstring):
-		url = ""
-		servicereference = ""
-		if self.enigma_type == 0:
-			root = xml.etree.cElementTree.fromstring(xmlstring)
-			for service in root.findall("e2service"):
-				servicereference = str(service.findtext("e2servicereference", '').encode("utf-8", 'ignore'))
-			if len(servicereference) > 0:
-				url = "http://" + self.ip + ":8001/" + servicereference
-			else:
-				self.close()
-		else:
-			url = xmlstring
-		if len(url) > 0:
-			self.session.nav.stopService()
-			sref = eServiceReference(ENIGMA_WEBSERVICE_ID, 0, url)
-			self.session.nav.playService(sref)
-			self.session.openWithCallback(self.RemotePlayerFinished, RemotePlayer,"" ,"", 0, 0, self.PartnerboxEntry, servicereference)
-		else:
-			self.close()
-		
-	def RemotePlayerFinished(self):
-		self.session.nav.playService(self.CurrentService)
-		self.close()
-		
-	def Error(self, error = None):
-		self.close()
-
 class RemoteTimer(Screen):
 	global CurrentParnerBoxName
 	skin = """
@@ -261,20 +184,20 @@ class RemoteTimer(Screen):
 		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 		self.port = partnerboxentry.port.value
 		self.http = "http://%s:%d" % (self.ip,self.port)
-		self.enigma_type = int(partnerboxentry.enigma.value)
 		self.useinternal = int(partnerboxentry.useinternal.value)
+		try:
+			self.webiftype = partnerboxentry.webinterfacetype.value
+		except:
+			self.webiftype = "standard"
 		self.oldstart = 0
 		self.oldend = 0
 		self.oldtype = 0
 		self.Locations = []
-		self["timerlist"] = E2TimerMenu(self.enigma_type)
+		self["timerlist"] = E2TimerMenu()
 		
 	def getLocations(self):
-		if self.enigma_type == 0:
-			sCommand = self.http + "/web/getlocations"
-			sendPartnerBoxWebCommand(sCommand, None,3, self.username, self.password).addCallback(self.getLocationsCallback).addErrback(self.deleteTimerError)
-		else:
-			self.addTimer()
+		sCommand = self.http + "/web/getlocations"
+		sendPartnerBoxWebCommand(sCommand, 3, self.username, self.password, self.webiftype).addCallback(self.getLocationsCallback).addErrback(self.deleteTimerError)
 	
 	def getLocationsCallback(self, xmlstring):
 		self.Locations = []
@@ -300,26 +223,10 @@ class RemoteTimer(Screen):
 		if answer[0]:
 			entry = answer[1]
 			self["timerlist"].instance.hide()
-			if self.enigma_type == 0:
-				ref_old = "&channelOld=" + urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&beginOld=" + ("%s"%(self.oldstart)) + "&endOld=" + ("%s"%(self.oldend))  + "&deleteOldOnSave=1"
-				ref = urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&begin=" + ("%s"%(entry.timebegin)) + "&end=" + ("%s"%(entry.timeend))  + "&name=" + urllib.quote(entry.name) + "&description=" + urllib.quote(entry.description) + "&dirname=" + urllib.quote(entry.dirname) + "&eit=0&justplay=" + ("%s"%(entry.justplay)) + "&afterevent=" + ("%s"%(entry.afterevent))
-				sCommand = self.http + "/web/timerchange?sRef=" + ref + ref_old
-				sendPartnerBoxWebCommand(sCommand, None,10, self.username, self.password).addCallback(self.deleteTimerCallback).addErrback(self.downloadError)
-			else:
-				if entry.justplay & PlaylistEntry.SwitchTimerEntry:
-					action = "zap"
-				elif entry.justplay & PlaylistEntry.recNgrab:
-					action = "ngrab"
-				else:
-					action = ""
-				tstart = time.localtime(entry.timebegin)
-				tend = time.localtime(entry.timeend)
-				ref_time_start = "&sday=" + ("%s"%(tstart.tm_mday)) + "&smonth=" + ("%s"%(tstart.tm_mon)) + "&syear=" + ("%s"%(tstart.tm_year)) + "&shour=" + ("%s"%(tstart.tm_hour)) + "&smin=" + ("%s"%(tstart.tm_min))
-				ref_time_end = "&eday=" + ("%s"%(tend.tm_mday)) + "&emonth=" + ("%s"%(tend.tm_mon)) + "&eyear=" + ("%s"%(tend.tm_year)) + "&ehour=" + ("%s"%(tend.tm_hour)) + "&emin=" + ("%s"%(tend.tm_min))
-				ref_old = "&old_type=" + ("%s"%(self.oldtype)) + "&old_stime=" + ("%s"%(self.oldstart)) + "&force=yes"
-				ref = urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&descr=" + urllib.quote(entry.description) + "&channel=" + urllib.quote(entry.servicename) + "&after_event=" + ("%s"%(entry.afterevent)) + "&action=" + ("%s"%(action))
-				sCommand = self.http + "/changeTimerEvent?ref=" + ref + ref_old + ref_time_start + ref_time_end
-				sendPartnerBoxWebCommand(sCommand, None,10, self.username, self.password).addCallback(self.deleteTimerCallback).addErrback(self.downloadError)
+			ref_old = "&channelOld=" + urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&beginOld=" + ("%s"%(self.oldstart)) + "&endOld=" + ("%s"%(self.oldend))  + "&deleteOldOnSave=1"
+			ref = urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&begin=" + ("%s"%(entry.timebegin)) + "&end=" + ("%s"%(entry.timeend))  + "&name=" + urllib.quote(entry.name) + "&description=" + urllib.quote(entry.description) + "&dirname=" + urllib.quote(entry.dirname) + "&eit=0&justplay=" + ("%s"%(entry.justplay)) + "&afterevent=" + ("%s"%(entry.afterevent))
+			sCommand = self.http + "/web/timerchange?sRef=" + ref + ref_old
+			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.deleteTimerCallback).addErrback(self.downloadError)
 	
 	def startRun(self):
 		self["timerlist"].instance.hide()
@@ -328,11 +235,8 @@ class RemoteTimer(Screen):
 	def cleanupTimer(self):
 		self["timerlist"].instance.hide()
 		self["text"].setText(_("Cleaning up finished timer entries..."))
-		if self.enigma_type == 0:
-			sCommand = self.http + "/web/timercleanup?cleanup=1"
-		else:
-			sCommand = self.http + "/cleanupTimerList"
-		sendPartnerBoxWebCommand(sCommand, None,3, self.username, self.password).addCallback(self.cleanupTimerlistCallback).addErrback(self.cleanupTimerlistCallback)
+		sCommand = self.http + "/web/timercleanup?cleanup=1"
+		sendPartnerBoxWebCommand(sCommand, 3, self.username, self.password, self.webiftype).addCallback(self.cleanupTimerlistCallback).addErrback(self.cleanupTimerlistCallback)
 			
 	def cleanupTimerlistCallback(self, answer):
 		self.action()
@@ -342,10 +246,7 @@ class RemoteTimer(Screen):
 			sel = self["timerlist"].l.getCurrentSelection()[0]
 			if sel is None:
 				return
-			if self.enigma_type == 0:
-				name = sel.name
-			else:
-				name = sel.description
+			name = sel.name
 			self.session.openWithCallback(self.deleteTimerConfirmed, MessageBox, _("Do you really want to delete the timer \n%s ?") % name)
 		except: return
 
@@ -354,11 +255,8 @@ class RemoteTimer(Screen):
 			sel = self["timerlist"].l.getCurrentSelection()[0]
 			if sel is None:
 				return
-			if self.enigma_type == 0:
-				sCommand = self.http + "/web/timerdelete?sRef=" + sel.servicereference + "&begin=" + ("%s"%(sel.timebegin)) + "&end=" +("%s"%(sel.timeend))
-			else:
-				sCommand = self.http + "/deleteTimerEvent?ref=" + sel.servicereference + "&start=" + ("%s"%(sel.timebegin)) + "&type=" +("%s"%(sel.type)) + "&force=yes"
-			sendPartnerBoxWebCommand(sCommand, None,3, self.username, self.password).addCallback(self.deleteTimerCallback).addErrback(self.deleteTimerError)
+			sCommand = self.http + "/web/timerdelete?sRef=" + sel.servicereference + "&begin=" + ("%s"%(sel.timebegin)) + "&end=" +("%s"%(sel.timeend))
+			sendPartnerBoxWebCommand(sCommand, 3, self.username, self.password, self.webiftype).addCallback(self.deleteTimerCallback).addErrback(self.deleteTimerError)
 	
 	def deleteTimerCallback(self, callback = None):
 		self.action()
@@ -377,18 +275,12 @@ class RemoteTimer(Screen):
 			self["text"].setText(str(error.getErrorMessage()))
 
 	def action(self):
-		if self.enigma_type == 0:
-			url = self.http + "/web/timerlist"
-		else:
-			url = self.http + "/xml/timers"
-		sendPartnerBoxWebCommand(url, None,10, self.username, self.password).addCallback(self.downloadCallback).addErrback(self.downloadError)
+		url = self.http + "/web/timerlist"
+		sendPartnerBoxWebCommand(url, 10, self.username, self.password, self.webiftype).addCallback(self.downloadCallback).addErrback(self.downloadError)
 
 	def readXML(self, xmlstring):
 		self.E2TimerList = []
-		if self.enigma_type == 0:
-			self.E2TimerList = FillE2TimerList(xmlstring)
-		else:
-			self.E2TimerList = FillE1TimerList(xmlstring)
+		self.E2TimerList = FillE2TimerList(xmlstring)
 		self["timerlist"].setList([ (x,) for x in self.E2TimerList])
 
 	def EPGList(self):
@@ -419,26 +311,26 @@ class RemoteTimerBouquetList(Screen):
 		self.PartnerboxEntry = partnerboxentry
 		self.password = partnerboxentry.password.value
 		self.username = "root"
+		try:
+			self.webiftype = partnerboxentry.webinterfacetype.value
+		except:
+			self.webiftype = "standard"
 		ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 		port = partnerboxentry.port.value
 		self.http = "http://%s:%d" % (ip,port)
-		self.enigma_type = int(partnerboxentry.enigma.value)
 		self.useinternal = int(partnerboxentry.useinternal.value)
 		self.playeronly = playeronly
-		if self.enigma_type == 0:
-			self.url = self.http + "/web/getservices"
-		else:
-			self.url = self.http + "/xml/services?mode=0&submode=4"
-		self.E1XMLString = ""
-		
+		self.url = self.http + "/web/getservices"
 		
 	def action(self):
 		try:
 			sel = self["bouquetlist"].l.getCurrentSelection()[0]
 			if sel is None:
 				return
-			self.session.openWithCallback(self.CallbackEPGList, RemoteTimerChannelList, self.E2TimerList, sel.servicereference, sel.servicename, self.PartnerboxEntry, self.E1XMLString, self.playeronly)
-		except: return
+			self.session.openWithCallback(self.CallbackEPGList, RemoteTimerChannelList, self.E2TimerList, sel.servicereference, sel.servicename, self.PartnerboxEntry, self.playeronly)
+		except Exception, e:
+			print e 
+			return
 		
 	def CallbackEPGList(self):
 		pass
@@ -455,28 +347,15 @@ class RemoteTimerBouquetList(Screen):
 			self.getBouquetList()
 	
 	def getBouquetList(self):
-		sendPartnerBoxWebCommand(self.url, None,10, self.username, self.password).addCallback(self.downloadCallback).addErrback(self.downloadError)
+		sendPartnerBoxWebCommand(self.url, 10, self.username, self.password, self.webiftype).addCallback(self.downloadCallback).addErrback(self.downloadError)
 		
 	def downloadCallback(self, callback = None):
-		if self.enigma_type == 0:
-			self.readXML(callback)
-		else:
-			self.readXMLE1(callback)
+		self.readXML(callback)
 		self["bouquetlist"].instance.show()
 
 	def downloadError(self, error = None):
 		if error is not None:
 			self["text"].setText(str(error.getErrorMessage()))
-
-	def readXMLE1(self,xmlstring):
-		self.E1XMLString = xmlstring
-		BouquetList = []
-		root = xml.etree.cElementTree.fromstring(xmlstring)
-		for bouquets in root.findall("bouquet"):
-			BouquetList.append(E2ServiceList(
-			servicereference = str(bouquets.findtext("reference", '').encode("utf-8", 'ignore')),
-			servicename = str(bouquets.findtext("name", 'n/a').encode("utf-8", 'ignore'))))
-		self["bouquetlist"].buildList(BouquetList)
 
 	def readXML(self, xmlstring):
 		BouquetList = []
@@ -509,7 +388,7 @@ class RemoteTimerChannelList(Screen):
 			<widget name="text" position="10,60" size="930,450" zPosition="1" font="Regular;20" halign="center" valign="center" />
 		</screen>"""
 	
-	def __init__(self, session, E2Timerlist, ServiceReference, ServiceName, partnerboxentry, E1XMLString,  playeronly):
+	def __init__(self, session, E2Timerlist, ServiceReference, ServiceName, partnerboxentry, playeronly):
 		self.session = session
 		Screen.__init__(self, session)
 		self["channellist"] = E2ChannelList([], selChangedCB = self.onSelectionChanged)
@@ -527,10 +406,9 @@ class RemoteTimerChannelList(Screen):
 		self.E2TimerList = E2Timerlist
 		self.E2ChannelList = []
 		self.servicereference = ServiceReference
-		self.E1XMLString = E1XMLString
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions", "ColorActions"],
 		{
-			"ok": self.PlayRemoteStream,
+			"ok": self.EPGSelection,
 			"back": self.close,
 			"yellow": self.EPGSelection,
 			"blue": self.EPGEvent,
@@ -541,10 +419,13 @@ class RemoteTimerChannelList(Screen):
 		self.PartnerboxEntry = partnerboxentry
 		self.password = partnerboxentry.password.value
 		self.username = "root"
+		try:
+			self.webiftype = partnerboxentry.webinterfacetype.value
+		except:
+			self.webiftype = "standard"
 		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 		self.port = partnerboxentry.port.value
 		self.http = "http://%s:%d" % (self.ip,self.port)
-		self.enigma_type = int(partnerboxentry.enigma.value)
 		self.useinternal = int(partnerboxentry.useinternal.value)
 		self.zaptoservicewhenstreaming = partnerboxentry.zaptoservicewhenstreaming.value
 		self.key_green_choice = self.ADD_TIMER
@@ -573,22 +454,7 @@ class RemoteTimerChannelList(Screen):
 		else:
 			self["channellist"].instance.hide()
 			self.getChannelList()
-	
-	def PlayRemoteStream(self):
-		if self.playeronly == 1:
-			if self.mode == self.REMOTE_TIMER_MODE:
-				self.mode = self.REMOTE_TV_MODE
-				if self.zaptoservicewhenstreaming == False and self.enigma_type == 0:
-					self.GetStreamInfosCallback()
-				else:
-					self.Zap()
-			else:
-				self.session.nav.playService(self.CurrentService)
-				self.mode = self.REMOTE_TIMER_MODE
-				self["channellist"].instance.show()
-		else:
-			self.EPGSelection()
-			
+		
 	def Zap(self):
 		sel = None
 		try:
@@ -604,38 +470,24 @@ class RemoteTimerChannelList(Screen):
 			self.session.nav.playService(eServiceReference(sel.servicereference))
 			self.ZapCallback(None)
 		else:
-			if self.enigma_type == 0:
-				url = self.http + "/web/zap?sRef=" + urllib.quote(sel.servicereference.decode('utf8').encode('latin-1','ignore'))
-			else:
-				url = self.http + "/cgi-bin/zapTo?path=" + urllib.quote(sel.servicereference.decode('utf8').encode('latin-1','ignore'))
-			sendPartnerBoxWebCommand(url, None,10, self.username, self.password).addCallback(self.ZapCallback).addErrback(self.DoNotCareError)
+			url = self.http + "/web/zap?sRef=" + urllib.quote(sel.servicereference.decode('utf8').encode('latin-1','ignore'))
+			sendPartnerBoxWebCommand(url, 10, self.username, self.password, self.webiftype).addCallback(self.ZapCallback).addErrback(self.DoNotCareError)
 	
 	def DoNotCareError(self, dnce = None):
 		# Jesses, E1 sendet 204 nach umschalten, kommt hier also immer rein...
+		print "[Partnerbox] - there was an error"
 		self.ZapCallback(dnce)
 	
 	def ZapCallback(self, callback = None):
 		if self.mode == self.REMOTE_TIMER_MODE:
 			self["text"].setText("Give Enigma time to fill epg cache...")
 			self.zapTimer.start(10000) # 10 Sekunden
-		else:
-			self.zapTimer.start(3000) # 3 Sekunden REMOTE_TV
 		
 	def zapTimerTimeout(self):
 		if self.zapTimer.isActive():
 			self.zapTimer.stop()
 		if self.mode == self.REMOTE_TIMER_MODE:
 			self.startRun()
-		else:
-			self.GetStreamInfosCallback()
-	
-	def GetStreamInfosCallback(self):
-		if self.enigma_type == 0:
-			url = "http://" + self.ip + ":8001/" + self["channellist"].l.getCurrentSelection()[0].servicereference 
-			self.StreamTV(url)
-		else:
-			url = self.http + "/video.m3u"
-			sendPartnerBoxWebCommand(url, None,10, self.username, self.password).addCallback(self.StreamTV).addErrback(self.ChannelListDownloadError)
 			
 	def MoveItem(self, next):
 		self.mode = self.REMOTE_TIMER_MODE
@@ -644,12 +496,6 @@ class RemoteTimerChannelList(Screen):
 			self["channellist"].moveSelection(eListbox.moveDown)
 		else:
 			self["channellist"].moveSelection(eListbox.moveUp)
-	
-	def StreamTV(self, connectstring):
-			self.session.nav.stopService()
-			sref = eServiceReference(ENIGMA_WEBSERVICE_ID, 0, connectstring)
-			self.session.nav.playService(sref)
-			self.session.openWithCallback(self.PlayRemoteStream, RemotePlayer, self["channellist"].l.getCurrentSelection()[0].servicename,self["channellist"].l.getCurrentSelection()[0].eventtitle, self["channellist"].l.getCurrentSelection()[0].eventstart, self["channellist"].l.getCurrentSelection()[0].eventduration, self.PartnerboxEntry, self["channellist"].l.getCurrentSelection()[0].servicereference, self.session.current_dialog)
 	
 	def EPGEvent(self):
 		sel = self["channellist"].l.getCurrentSelection()[0]
@@ -705,58 +551,9 @@ class RemoteTimerChannelList(Screen):
 			self.mode = REMOTE_TIMER_MODE
 			
 	def getChannelList(self):
-		if self.enigma_type == 0:
-			ref = urllib.quote(self.servicereference.decode('utf8').encode('latin-1','ignore'))
-			url = self.http + "/web/epgnow?bRef=" + ref
-			sendPartnerBoxWebCommand(url, None,10, self.username, self.password).addCallback(self.ChannelListDownloadCallback).addErrback(self.ChannelListDownloadError)
-		else:
-			self.readXMLServiceListE1()
-			if self.ChannelListCurrentIndex !=0:
-				sel = self["channellist"].moveSelectionTo(self.ChannelListCurrentIndex)
-				self.ChannelListCurrentIndex = 0
-			self["channellist"].instance.show()
-
-	def readXMLServiceListE1(self):
-		self.E2ChannelList = []
-		root = xml.etree.cElementTree.fromstring(self.E1XMLString)
-		for bouquets in root.findall("bouquet"):
-			tempref = str(bouquets.findtext("reference", '').encode("utf-8", 'ignore'))
-			if tempref == self.servicereference:
-				for services in bouquets.findall("service"):
-					servicereference = str(services.findtext("reference", '').encode("utf-8", 'ignore'))
-					servicename = str(services.findtext("name", 'n/a').encode("utf-8", 'ignore'))
-					http_ = "%s:%d" % (self.ip,self.port)
-					url = "http://" + self.username + ":" + self.password + "@" + http_ + "/xml/serviceepg?ref=" + servicereference + "&entries=1"
-					f = urllib.urlopen(url)
-					sxml = f.read()
-					eventstart, eventduration, eventtitle, eventdescriptionextended, eventdescription, eventid = self.XMLReadEPGDataE1(sxml)
-					self.E2ChannelList.append(E2EPGListAllData(servicereference = servicereference, servicename = servicename, eventstart = eventstart, eventduration = eventduration, eventtitle = eventtitle, eventid = eventid , eventdescription= eventdescription, eventdescriptionextended = eventdescriptionextended))
-		self["channellist"].buildList(self.E2ChannelList)
-		
-	def XMLReadEPGDataE1(self,xmlstring):
-		eventstart = 0
-		eventduration = 0
-		eventtitle = ""
-		eventdescriptionextended = ""
-		eventdescription = ""
-		eventid = 0
-		xmlstring = xmlstring.replace("""<?xml-stylesheet type="text/xsl" href="/xml/serviceepg.xsl"?>""","")
-		root = xml.etree.cElementTree.fromstring(xmlstring)
-		for events in root.findall("event"):
-			try:eventtitle = str(events.findtext("description", '').encode("utf-8", 'ignore'))
-			except:eventtitle = ""
-			try:eventdescriptionextended = str(events.findtext("details", '').encode("utf-8", 'ignore'))
-			except:eventdescriptionextended = ""
-			try:eventdescription = str(events.findtext("genre", '').encode("utf-8", 'ignore'))
-			except:eventdescription = ""
-			try:eventstart = int(events.findtext("start", 0))
-			except:eventstart = 0
-			try:eventduration = int(events.findtext("duration", 0))
-			except:eventduration = 0
-		if eventstart != 0:
-			eventid = 1
-
-		return eventstart, eventduration, eventtitle, eventdescriptionextended, eventdescription,eventid
+		ref = urllib.quote(self.servicereference.decode('utf8').encode('latin-1','ignore'))
+		url = self.http + "/web/epgnow?bRef=" + ref
+		sendPartnerBoxWebCommand(url, 10, self.username, self.password, self.webiftype).addCallback(self.ChannelListDownloadCallback).addErrback(self.ChannelListDownloadError)
 
 	def readXMLServiceList(self, xmlstring):
 		self.E2ChannelList = []
@@ -795,168 +592,6 @@ class RemoteTimerChannelList(Screen):
 	def CallbackEPGSelection(self):
 		pass
 
-class RemotePlayer(Screen, InfoBarAudioSelection):
-	
-	
-	HDSkn = False
-	try:
-		sz_w = getDesktop(0).size().width()
-		if sz_w == 1280:
-			HDSkn = True
-		else:
-			HDSkn = False
-	except:
-		HDSkn = False
-	if HDSkn:
-		skin="""
-		<screen name="RemotePlayer" flags="wfNoBorder" position="283,102" size="720,576" title="Partnerbox - RemotePlayer" backgroundColor="#FFFFFFFF">
-			<ePixmap position="41,388" zPosition="-1" size="630,130" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/Partnerbox/ExPlayer.png" alphatest="off" transparent="1"/>
-			<widget name="ServiceName" zPosition="1" position="50,404" size="610,59" valign="center" halign="center" font="Regular;21" foregroundColor="#F0F0F0" backgroundColor="#302C2C39" />
-			<widget name="DateTime" zPosition="1" position="52,473" size="500,30" halign="left" font="Regular;16" foregroundColor="#F0F0F0" backgroundColor="#302C2C39" transparent="1" />
-			<widget name="IP" zPosition="2" position="361,473" size="300,30" halign="right" font="Regular;16" foregroundColor="#F0F0F0" backgroundColor="#302C2C39" transparent="1" />
-		</screen>"""
-	else:
-		skin="""
-		<screen name="RemotePlayer" flags="wfNoBorder" position="3,30" size="720,576" title="Partnerbox - RemotePlayer" backgroundColor="#FFFFFFFF">
-			<ePixmap position="41,388" zPosition="-1" size="630,130" pixmap="/usr/lib/enigma2/python/Plugins/Extensions/Partnerbox/ExPlayer.png" alphatest="off" transparent="1"/>
-			<widget name="ServiceName" zPosition="1" position="50,404" size="610,59" valign="center" halign="center" font="Regular;21" foregroundColor="#F0F0F0" backgroundColor="#302C2C39" />
-			<widget name="DateTime" zPosition="1" position="52,473" size="500,30" halign="left" font="Regular;16" foregroundColor="#F0F0F0" backgroundColor="#302C2C39" transparent="1" />
-			<widget name="IP" zPosition="2" position="361,473" size="300,30" halign="right" font="Regular;16" foregroundColor="#F0F0F0" backgroundColor="#302C2C39" transparent="1" />
-		</screen>"""
-	
-	def __init__(self, session, ServiceName, EventTitle, eventstart, eventduration, partnerboxentry, servicereference, parent = None):
-		self.session = session
-		Screen.__init__(self, session)
-		InfoBarAudioSelection.__init__(self)
-		self.enigma_type = int(partnerboxentry.enigma.value)
-		self.useinternal = int(partnerboxentry.useinternal.value)
-		endtime = int(eventstart + eventduration)
-		tt = ((" %s ... %s (+%d " + _("mins") + ")") % (FuzzyTime(eventstart)[1], FuzzyTime(endtime)[1], (endtime - time.time()) / 60))	
-		self["ServiceName"] = Label(EventTitle)
-		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-		port = partnerboxentry.port.value
-		self.http = self.http = "http://%s:%d" % (self.ip,port)
-		self["IP"] = Label(self.ip)
-		if eventstart != 0:
-			self["DateTime"] = Label(ServiceName + ": " + tt)
-		else:
-			self["DateTime"] = Label()
-		self.isVisible = True
-		self["actions"] = ActionMap(["WizardActions", "DirectionActions", "ColorActions"],
-		{
-			"ok": self.Infobar,
-			"back": self.close,
-			"right": self.nextChannel,
-			"left": self.previousChannel,
-		}, -1)
-		self.password = partnerboxentry.password.value
-		self.username = "root"
-		self.servicereference = servicereference
-		self.onLayoutFinish.append(self.startRun)
-		self.onClose.append(self.__onClose)
-		
-		self.parent = parent
-		
-		self.Timer = eTimer()
-		self.Timer_conn = self.Timer.timeout.connect(self.TimerTimeout)
-		
-	def nextChannel(self):
-		if self.parent is not None:
-			self.parent.MoveItem(True)
-			self.close()
-	
-	def previousChannel(self):
-		if self.parent is not None:
-			self.parent.MoveItem(False)
-			self.close()
-		
-	def TimerTimeout(self):
-		if self.Timer.isActive():
-			self.Timer.stop()
-		self.Infobar()
-	
-	def startRun(self):
-		idx = config.usage.infobar_timeout.index
-		if idx:
-			self.Timer.start(idx * 1000)
-		else:
-			self.Timer.start(6 * 1000)
-		if self.enigma_type == 0:
-			url = self.http + "/web/epgservicenow?sRef=" + self.servicereference
-		else:
-			url = self.http + "/xml/serviceepg?ref=" + self.servicereference + "&entries=1"
-		sendPartnerBoxWebCommand(url, None,10, self.username, self.password).addCallback(self.CurrentEPGCallback).addErrback(self.CurrentEPGCallbackError)
-
-	def CurrentEPGCallback(self, xmlstring):
-		xmlstring = xmlstring.replace("""<?xml-stylesheet type="text/xsl" href="/xml/serviceepg.xsl"?>""","")
-		root = xml.etree.cElementTree.fromstring(xmlstring)
-		e2eventtitle = ""
-		e2eventservicename = ""
-		e2eventstart = 0
-		e2eventduration = 0
-		if self.enigma_type == 0:
-			for events in root.findall("e2event"):
-				try:e2eventservicename = str(events.findtext("e2eventservicename", 'n/a').encode("utf-8", 'ignore'))
-				except:e2eventservicename = "n/a"
-				try:e2eventstart = int(events.findtext("e2eventstart", 0))
-				except:e2eventstart = 0
-				try:e2eventduration = int(events.findtext("e2eventduration", 0))
-				except:e2eventduration  = 0
-				try:e2eventtitle = str(events.findtext("e2eventtitle", '').encode("utf-8", 'ignore'))
-				except:e2eventtitle = ""
-		else:
-			for services in root.findall("service"):
-				try:e2eventservicename = str(services.findtext("name", 'n/a').encode("utf-8", 'ignore'))
-				except:e2eventservicename = "n/a"
-			for events in root.findall("event"):
-				try:e2eventstart = int(events.findtext("start", 0))
-				except:e2eventstart = 0
-				try:e2eventduration = int(events.findtext("duration", 0))
-				except:e2eventduration  = 0
-				try:e2eventtitle = str(events.findtext("description", '').encode("utf-8", 'ignore'))
-				except:e2eventtitle = ""
-		endtime = int(e2eventstart + e2eventduration)
-		if endtime != 0:
-			tt = ((": %s ... %s (+%d " + _("mins") + ")") % (FuzzyTime(e2eventstart)[1], FuzzyTime(endtime)[1], (endtime - time.time()) / 60))
-		else:
-			tt = ""
-		self["ServiceName"].setText(e2eventtitle)
-		self["DateTime"].setText(e2eventservicename + tt)
-
-	def CurrentEPGCallbackError(self, error = None):
-		print "[RemotePlayer] Error: ",error.getErrorMessage()
-		
-#	def readXMSubChanelList(self, xmlstring):
-#		BouquetList = []
-#		counter = 0
-#		dom = xml.dom.minidom.parseString(xmlstring)
-#		for node in dom.firstChild.childNodes:
-#			servicereference = ""
-#			servicename = ""
-#			if node.nodeName == "e2service":
-#				for node2 in node.childNodes:
-#					if node2.nodeName == "e2servicereference": servicereference = str(node2.firstChild.data.strip().encode("utf-8"))
-#					if node2.nodeName == "e2servicename":
-#						try:servicename = str(node2.firstChild.data.strip().encode("utf-8"))
-#						except:servicename = "n/a"
-#						if counter != 0: # erster Eintrag ist der aktuelle Sedner, nicht aufnehmen
-#							BouquetList.append(E2ServiceList(servicereference = servicereference, servicename = servicename))
-#						counter += 1
-	
-	def Infobar(self):
-		if self.isVisible:
-			if self.Timer.isActive():
-				self.Timer.stop()
-			self.hide()
-			self.isVisible = False
-		else:
-			self.startRun()
-			self.show()
-			self.isVisible = True
-			
-	def __onClose(self):
-		if self.Timer.isActive():
-			self.Timer.stop()
 		
 class RemoteTimerEPGList(Screen):
 	EMPTY = 0
@@ -1000,16 +635,16 @@ class RemoteTimerEPGList(Screen):
 		self.PartnerboxEntry = partnerboxentry
 		self.password = partnerboxentry.password.value
 		self.username = "root"
+		try:
+			self.webiftype = partnerboxentry.webinterfacetype.value
+		except:
+			self.webiftype = "standard"
 		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 		port = partnerboxentry.port.value
 		self.http = "http://%s:%d" % (self.ip,port)
-		self.enigma_type = int(partnerboxentry.enigma.value)
 		self.useinternal = int(partnerboxentry.useinternal.value)
 		
-		if self.enigma_type == 0:
-			self.url = self.http + "/web/epgservice?sRef=" + urllib.quote(self.servicereference.decode('utf8').encode('latin-1','ignore'))
-		else:
-			self.url = self.http + "/xml/serviceepg?ref=" + urllib.quote(self.servicereference.decode('utf8').encode('latin-1','ignore'))
+		self.url = self.http + "/web/epgservice?sRef=" + urllib.quote(self.servicereference.decode('utf8').encode('latin-1','ignore'))
 		self.ListCurrentIndex = 0
 		self.Locations = []
 		
@@ -1063,43 +698,15 @@ class RemoteTimerEPGList(Screen):
 			self.getEPGList()
 	
 	def getEPGList(self):
-			sendPartnerBoxWebCommand(self.url, None,10, self.username, self.password).addCallback(self.EPGListDownloadCallback).addErrback(self.EPGListDownloadError)
+			sendPartnerBoxWebCommand(self.url, 10, self.username, self.password, self.webiftype).addCallback(self.EPGListDownloadCallback).addErrback(self.EPGListDownloadError)
 		
 	def EPGListDownloadCallback(self, callback = None):
-		if self.enigma_type == 0:
-			self.readXMLEPGList(callback)
-		else:
-			self.readXMLEPGListE1(callback)
+		self.readXMLEPGList(callback)
 		self["epglist"].instance.show()
 	
 	def EPGListDownloadError(self, error = None):
 		if error is not None:
 			self["text"].setText(str(error.getErrorMessage()))
-	
-	def readXMLEPGListE1(self, xmlstring):
-		E1ListEPG = []
-		xmlstring = xmlstring.replace("""<?xml-stylesheet type="text/xsl" href="/xml/serviceepg.xsl"?>""","")
-		root = xml.etree.cElementTree.fromstring(xmlstring)
-		for services in root.findall("service"):
-			servicereference = str(services.findtext("reference", 'n/a').encode("utf-8", 'ignore'))
-			try:servicename = str(services.findtext("name", 'n/a').encode("utf-8", 'ignore'))
-			except:servicename = "n/a"
-		for events in root.findall("event"):
-			try:eventstart = int(events.findtext("start", 0))
-			except:eventstart = 0
-			try:eventduration = int(events.findtext("duration", 0))
-			except:eventduration  = 0
-			try:eventtitle = str(events.findtext("description", '').encode("utf-8", 'ignore'))
-			except:eventtitle = ""
-			try:eventdescription = str(events.findtext("genre", '').encode("utf-8", 'ignore'))
-			except:eventdescription = ""
-			try:eventdescriptionextended = str(events.findtext("details", '').encode("utf-8", 'ignore'))
-			except:eventdescriptionextended = ""
-			E1ListEPG.append(E2EPGListAllData(servicereference = servicereference, servicename = servicename, eventid = 1, eventstart = eventstart, eventduration = eventduration, eventtitle = eventtitle, eventdescription = eventdescription, eventdescriptionextended = eventdescriptionextended  ))
-		self["epglist"].buildList(E1ListEPG, self.E2TimerList)
-		if self.ListCurrentIndex != 0:
-			sel = self["epglist"].moveSelectionTo(self.ListCurrentIndex)
-			self.ListCurrentIndex = 0
 	
 	def readXMLEPGList(self, xmlstring):
 		E2ListEPG = []
@@ -1127,10 +734,7 @@ class RemoteTimerEPGList(Screen):
 		
 	def GreenPressed(self):
 		if self.key_green_choice == self.ADD_TIMER:
-			if self.enigma_type == 0:
-				self.getLocations()
-			else:
-				self.addTimerEvent()
+			self.getLocations()
 		elif self.key_green_choice == self.REMOVE_TIMER:
 			self.deleteTimer()
 	
@@ -1141,7 +745,7 @@ class RemoteTimerEPGList(Screen):
 	
 	def getLocations(self):
 		sCommand = self.http + "/web/getlocations"
-		sendPartnerBoxWebCommand(sCommand, None,3, self.username, self.password).addCallback(self.getLocationsCallback).addErrback(self.LocationsError)
+		sendPartnerBoxWebCommand(sCommand, 3, self.username, self.password, self.webiftype).addCallback(self.getLocationsCallback).addErrback(self.LocationsError)
 	
 	def getLocationsCallback(self, xmlstring):
 		self.Locations = []
@@ -1152,14 +756,9 @@ class RemoteTimerEPGList(Screen):
 		cur = self["epglist"].getCurrent()
 		if cur is None:
 			return
-		if self.enigma_type == 0:
-			description = cur[0].eventdescription
-			type = 0
-			dirname = "/media/hdd/movie/"
-		else:
-			dirname = ""
-			type = PlaylistEntry.RecTimerEntry|PlaylistEntry.recDVR
-			description = cur[0].eventtitle
+		description = cur[0].eventdescription
+		type = 0
+		dirname = "/media/hdd/movie/"
 		timerentry = E2Timer(servicereference = cur[0].servicereference, servicename = cur[0].servicename, name = cur[0].eventtitle, disabled = 0, timebegin = cur[0].eventstart, timeend = cur[0].eventstart + cur[0].eventduration, duration = cur[0].eventduration, startprepare = 0, state = 0 , repeated = 0, justplay= 0, eventId = 0, afterevent = 0, dirname = dirname, description = description, type = type )
 		self.session.openWithCallback(self.RemoteTimerEntryFinished, RemoteTimerEntry,timerentry, self.Locations)
 
@@ -1168,20 +767,9 @@ class RemoteTimerEPGList(Screen):
 			self.ListCurrentIndex = self["epglist"].getCurrentIndex()
 			entry = answer[1]
 			self["epglist"].instance.hide()
-			if self.enigma_type == 0:
-				ref = urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&begin=" + ("%s"%(entry.timebegin)) + "&end=" + ("%s"%(entry.timeend))  + "&name=" + urllib.quote(entry.name) + "&description=" + urllib.quote(entry.description) + "&dirname=" + urllib.quote(entry.dirname) + "&eit=0&justplay=" + ("%s"%(entry.justplay)) + "&afterevent=" + ("%s"%(entry.afterevent))
-				sCommand = self.http + "/web/timeradd?sRef=" + ref
-				sendPartnerBoxWebCommand(sCommand, None,10, self.username, self.password).addCallback(self.deleteTimerCallback).addErrback(self.EPGListDownloadError)
-			else:
-				if entry.justplay & PlaylistEntry.SwitchTimerEntry:
-					action = "zap"
-				elif entry.justplay & PlaylistEntry.recNgrab:
-					action = "ngrab"
-				else:
-					action = ""
-				ref = urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&start=" + ("%s"%(entry.timebegin)) + "&duration=" + ("%s"%(entry.timeend - entry.timebegin))  + "&descr=" + urllib.quote(entry.description) + "&channel=" + urllib.quote(entry.servicename) + "&after_event=" + ("%s"%(entry.afterevent)) + "&action=" + ("%s"%(action))
-				sCommand = self.http + "/addTimerEvent?ref=" + ref
-				sendPartnerBoxWebCommand(sCommand, None,10, self.username, self.password).addCallback(self.deleteTimerCallback).addErrback(self.EPGListDownloadError)
+			ref = urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&begin=" + ("%s"%(entry.timebegin)) + "&end=" + ("%s"%(entry.timeend))  + "&name=" + urllib.quote(entry.name) + "&description=" + urllib.quote(entry.description) + "&dirname=" + urllib.quote(entry.dirname) + "&eit=0&justplay=" + ("%s"%(entry.justplay)) + "&afterevent=" + ("%s"%(entry.afterevent))
+			sCommand = self.http + "/web/timeradd?sRef=" + ref
+			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.deleteTimerCallback).addErrback(self.EPGListDownloadError)
 	
 	def deleteTimer(self):
 		cur = self["epglist"].getCurrent()
@@ -1204,32 +792,18 @@ class RemoteTimerEPGList(Screen):
 				return
 			else:
 				self["epglist"].instance.hide()
-				if self.enigma_type == 0:
-					sCommand = self.http + "/web/timerdelete?sRef=" + timerentry.servicereference + "&begin=" + ("%s"%(timerentry.timebegin)) + "&end=" +("%s"%(timerentry.timeend))
-				else:
-					sCommand = self.http + "/deleteTimerEvent?ref=" + timerentry.servicereference + "&start=" + ("%s"%(timerentry.timebegin)) + "&type=" +("%s"%(timerentry.type)) + "&force=yes"
-				sendPartnerBoxWebCommand(sCommand, None,3, self.username, self.password).addCallback(self.deleteTimerCallback).addErrback(self.EPGListDownloadError)
+				sCommand = self.http + "/web/timerdelete?sRef=" + timerentry.servicereference + "&begin=" + ("%s"%(timerentry.timebegin)) + "&end=" +("%s"%(timerentry.timeend))
+				sendPartnerBoxWebCommand(sCommand, 3, self.username, self.password, self.webiftype).addCallback(self.deleteTimerCallback).addErrback(self.EPGListDownloadError)
 	
 	def deleteTimerCallback(self, callback = None):
-		if self.enigma_type == 0:
-			url = self.http + "/web/timerlist"
-		else:
-			if callback.find("Timer event deleted successfully.") != -1:
-				msg = "Timer event deleted successfully."
-			else:
-				msg = callback
-			self.session.open(MessageBox,msg,  MessageBox.TYPE_INFO, timeout = 3)
-			url = self.http + "/xml/timers"
-		sendPartnerBoxWebCommand(url, None,10, self.username, self.password).addCallback(self.readXML).addErrback(self.EPGListDownloadError)
+		url = self.http + "/web/timerlist"
+		sendPartnerBoxWebCommand(url, 10, self.username, self.password, self.webiftype).addCallback(self.readXML).addErrback(self.EPGListDownloadError)
 
 	def readXML(self, xmlstring = None):
 		if xmlstring is not None:
 			self["text"].setText("Getting timerlist data...")
 			self.E2TimerList = []
-			if self.enigma_type == 0:
-				self.E2TimerList = FillE2TimerList(xmlstring)
-			else:
-				self.E2TimerList = FillE1TimerList(xmlstring)
+			self.E2TimerList = FillE2TimerList(xmlstring)
 			self["text"].setText("Getting EPG data...")
 			if self.useinternal == 1:
 				EPGList = []
@@ -1254,13 +828,10 @@ class E2TimerMenu(GUIComponent, object):
 	SKIN_COMPONENT_ICON_WIDTH = "iconWidth"	
 	SKIN_COMPONENT_ICON_POS = "iconPos"
 
-	def __init__(self,enigma_type):
+	def __init__(self):
 		GUIComponent.__init__(self)
 		self.l = eListboxPythonMultiContent()
-		if enigma_type == 0:
-			self.l.setBuildFunc(self.buildEntry)
-		else:
-			self.l.setBuildFunc(self.buildEntryE1)
+		self.l.setBuildFunc(self.buildEntry)
 		tlf = TemplatedListFonts()
 		self.l.setFont(0, gFont(tlf.face(tlf.MEDIUM), tlf.size(tlf.MEDIUM)))
 		self.l.setFont(1, gFont(tlf.face(tlf.SMALL), tlf.size(tlf.SMALL)))
@@ -1327,62 +898,6 @@ class E2TimerMenu(GUIComponent, object):
 		
 		return res
 		
-	def buildEntryE1(self,timer):
-		sizes = componentSizes[E2TimerMenu.SKIN_COMPONENT_KEY]
-		servicenameHeight = sizes.get(E2TimerMenu.SKIN_COMPONENT_SERVICENAME_HEIGHT, 30)
-		nameHeight = sizes.get(E2TimerMenu.SKIN_COMPONENT_NAME_HEIGHT, 20)	
-		stateE1Width = sizes.get(E2TimerMenu.SKIN_COMPONENT_STATEE1_WIDTH, 170)	
-		width = self.l.getItemSize().width()
-		res = [ timer ]
-		res.append((eListboxPythonMultiContent.TYPE_TEXT, 5, 0, width, servicenameHeight, 0, RT_HALIGN_LEFT|RT_VALIGN_CENTER, timer.servicename))
-		res.append((eListboxPythonMultiContent.TYPE_TEXT, 5, servicenameHeight, width, nameHeight, 1, RT_HALIGN_LEFT|RT_VALIGN_CENTER, timer.description))
-
-		repeatedtext = ""
-		days = [ _("Sun"), _("Mon"), _("Tue"), _("Wed"), _("Thu"), _("Fri"), _("Sat") ]
-		if timer.type & PlaylistEntry.isRepeating :
-			mask = PlaylistEntry.Su
-			count = 0
-			for x in range(0, 7):
-				if timer.type & mask:
-					if (count != 0):
-						repeatedtext += ", "
-					repeatedtext += days[x]
-					count += 1
-				mask *= 2
-			if timer.type & PlaylistEntry.SwitchTimerEntry:
-				res.append((eListboxPythonMultiContent.TYPE_TEXT, 5, servicenameHeight+nameHeight, width-stateE1Width, nameHeight, 1, RT_HALIGN_LEFT|RT_VALIGN_CENTER, repeatedtext + ((" %s "+ _("(ZAP)")) % (FuzzyTime(timer.timebegin)[1]))))
-			elif timer.type & PlaylistEntry.RecTimerEntry:
-				res.append((eListboxPythonMultiContent.TYPE_TEXT, 5, servicenameHeight+nameHeight, width-stateE1Width, nameHeight, 1, RT_HALIGN_LEFT|RT_VALIGN_CENTER, repeatedtext + ((" %s ... %s (%d " + _("mins") + ")") % (FuzzyTime(timer.timebegin)[1], FuzzyTime(timer.timeend)[1], (timer.timeend - timer.timebegin) / 60))))
-		else:
-			if timer.type & PlaylistEntry.SwitchTimerEntry:
-				res.append((eListboxPythonMultiContent.TYPE_TEXT, 5, servicenameHeight+nameHeight, width-stateE1Width, nameHeight, 1, RT_HALIGN_LEFT|RT_VALIGN_CENTER, repeatedtext + (("%s, %s ... %s (%d " + _("mins") + ") ") % (FuzzyTime(timer.timebegin) + FuzzyTime(timer.timeend)[1:] + ((timer.timeend - timer.timebegin) / 60,))) + _("(ZAP)")))
-			elif timer.type & PlaylistEntry.RecTimerEntry:
-				res.append((eListboxPythonMultiContent.TYPE_TEXT, 5, servicenameHeight+nameHeight, width-stateE1Width, nameHeight, 1, RT_HALIGN_LEFT|RT_VALIGN_CENTER, repeatedtext + (("%s, %s ... %s (%d " + _("mins") + ")") % (FuzzyTime(timer.timebegin) + FuzzyTime(timer.timeend)[1:] + ((timer.timeend - timer.timebegin) / 60,)))))
-		
-		if timer.type & PlaylistEntry.stateWaiting:
-			state = _("waiting")
-		elif timer.type & PlaylistEntry.stateRunning:
-			if timer.type & PlaylistEntry.SwitchTimerEntry:
-				state = _("zapped")
-			elif timer.type & PlaylistEntry.RecTimerEntry:
-				state = _("recording...")
-		elif timer.type & PlaylistEntry.stateFinished:
-			state = _("done!")
-		elif timer.type & PlaylistEntry.stateError:
-			if timer.type & PlaylistEntry.errorNoSpaceLeft:
-				state = _("Error: No space left")
-			elif timer.type & PlaylistEntry.errorUserAborted:
-				state = _("Error: User aborted")
-			elif timer.type & PlaylistEntry.errorZapFailed:
-				state = _("Error: Zap failed")
-			elif timer.type & PlaylistEntry.errorOutdated:
-				state = _("Error: Outdated")
-			else:
-				state = "Error: " + _("<unknown>")
-		else:
-			state = _("<unknown>")
-		res.append((eListboxPythonMultiContent.TYPE_TEXT, width-stateE1Width, servicenameHeight+nameHeight, stateE1Width, nameHeight, 1, RT_HALIGN_RIGHT|RT_VALIGN_CENTER, state))
-		return res
 	def getCurrent(self):
 		cur = self.l.getCurrentSelection()
 		return cur and cur[0]
@@ -1680,10 +1195,13 @@ class RemoteTimerEventView(Screen):
 		self.PartnerboxEntry = partnerboxentry
 		self.password = partnerboxentry.password.value
 		self.username = "root"
+		try:
+			self.webiftype = partnerboxentry.webinterfacetype.value
+		except:
+			self.webiftype = "standard"
 		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 		port = partnerboxentry.port.value
 		self.http = "http://%s:%d" % (self.ip,port)
-		self.enigma_type = int(partnerboxentry.enigma.value)
 		self.useinternal = int(partnerboxentry.useinternal.value)
 
 	def startRun(self):
@@ -1775,10 +1293,7 @@ def startAddParnerboxService(self, insertType, session, what, partnerboxentry = 
 	if partnerboxentry is None:
 		self.close()
 	else:
-		if int(partnerboxentry.enigma.value) == 0:
-			self.session.openWithCallback(self.callbackPartnerboxServiceList, PartnerBouquetList, [], partnerboxentry, 1, insertType)
-		else:
-			self.session.open(MessageBox,_("You can not add services or bouquets from Enigma1-receivers into the channellist..."), MessageBox.TYPE_INFO)
+		self.session.openWithCallback(self.callbackPartnerboxServiceList, PartnerBouquetList, [], partnerboxentry, 1, insertType)
 
 def setParentalControlPin(self, insertType):
 		self.session.openWithCallback(boundFunction(self.parentalControlPinEntered, insertType), PinInput, pinList = [config.ParentalControl.servicepin[0].value], triesEntry = config.ParentalControl.retries.servicepin, title = _("Enter the service pin"), windowTitle = _("Change pin code"))
@@ -1864,7 +1379,7 @@ class PartnerBouquetList(RemoteTimerBouquetList):
 		except: return
 		ref = urllib.quote(sel.servicereference.decode('utf8').encode('latin-1','ignore'))
 		url = self.http + "/web/epgnow?bRef=" + ref
-		sendPartnerBoxWebCommand(url, None,10, self.username, self.password).addCallback(self.ChannelListDownloadCallback, sel).addErrback(self.ChannelListDownloadError)
+		sendPartnerBoxWebCommand(url, 10, self.username, self.password, self.webiftype).addCallback(self.ChannelListDownloadCallback, sel).addErrback(self.ChannelListDownloadError)
 
 	def ChannelListDownloadCallback(self, xmlstring, sel):
 		e2ChannelList = []
@@ -1883,7 +1398,7 @@ class PartnerBouquetList(RemoteTimerBouquetList):
 
 class PartnerChannelList(RemoteTimerChannelList):
 	def __init__(self, session, E2Timerlist, ServiceReference, ServiceName, partnerboxentry, playeronly):
-		RemoteTimerChannelList.__init__(self, session, E2Timerlist, ServiceReference, ServiceName, partnerboxentry, "",  playeronly)
+		RemoteTimerChannelList.__init__(self, session, E2Timerlist, ServiceReference, ServiceName, partnerboxentry, playeronly)
 		self.skinName = "RemoteTimerChannelList"
 		self.useinternal = 0 # always use partnerbox services
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions", "ColorActions"],

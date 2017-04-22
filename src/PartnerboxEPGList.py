@@ -4,7 +4,7 @@
 #  $Id$
 #
 #  Coded by Dr.Best (c) 2009
-#  Support: www.dreambox-tools.info
+#  Support: board.dreambox-tools.info
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License

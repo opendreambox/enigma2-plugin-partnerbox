@@ -4,7 +4,7 @@
 #  $Id$
 #
 #  Coded by Dr.Best (c) 2009
-#  Support: www.dreambox-tools.info
+#  Support: board.dreambox-tools.info
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -17,15 +17,12 @@
 #  GNU General Public License for more details.
 #
 
-import urllib
 from time import localtime
 from timer import TimerEntry
-from twisted.internet import reactor
-from twisted.web import client
-from twisted.web.client import HTTPClientFactory
-from base64 import encodestring
 import xml.etree.cElementTree
 import urlparse
+import connector as myconnector
+from Tools.BoundFunction import boundFunction
 
 CurrentIP = None
 remote_timer_list = None
@@ -108,7 +105,6 @@ def isInTimerList(begin, duration, service, eventid, timer_list):
 				break
 	return timerentry
 
-
 class E2Timer:
 	def __init__(self, servicereference = "", servicename = "", name = "", disabled = 0, timebegin = 0, timeend = 0, duration = 0, startprepare = 0, state = 0, repeated = 0, justplay = 0, eventId = 0, afterevent = 0, dirname = "", description = "", type = 0):
 		self.servicereference = servicereference
@@ -127,12 +123,6 @@ class E2Timer:
 		self.dirname = dirname
 		self.description = description
 		self.type = type
-		if type != 0: # E1 Timerlist
-			self.timeend = timebegin + duration
-			self.name = description
-			if type & PlaylistEntry.isRepeating:
-				self.repeated = 1
-			self.dirname = "/media/hdd/movie/"
 
 def FillE2TimerList(xmlstring, sreference = None):
 	E2TimerList = []
@@ -199,54 +189,57 @@ def FillE2TimerList(xmlstring, sreference = None):
 				description = str(timer.findtext("e2description", '').encode("utf-8", 'ignore')),
 				type = 0))
 	return E2TimerList
-
-
-def FillE1TimerList(xmlstring, sreference = None):
-	E1TimerList = []
-	try: root = xml.etree.cElementTree.fromstring(xmlstring)
-	except: return E1TimerList
-	for timer in root.findall("timer"):
-		try: typedata = int(timer.findtext("typedata", 0))
-		except: typedata = 0
-		for service in timer.findall("service"):
-			servicereference = str(service.findtext("reference", '').encode("utf-8", 'ignore'))
-			servicename = str(service.findtext("name", 'n/a').encode("utf-8", 'ignore'))
-		for event in timer.findall("event"):
-			try: timebegin = int(event.findtext("start", 0))
-			except: timebegin = 0
-			try: duration = int(event.findtext("duration", 0))
-			except: duration = 0
-			description = str(event.findtext("description", '').encode("utf-8", 'ignore'))
-		go = False
-		if sreference is None:
-			go = True
-		else:
-			if sreference.upper() == servicereference.upper() and ( (typedata & PlaylistEntry.stateWaiting) or (typedata & PlaylistEntry.stateRunning)):
-				go = True
-		if go:
-			E1TimerList.append(E2Timer(servicereference = servicereference, servicename = servicename, name = "", disabled = 0, timebegin = timebegin, timeend = 0, duration = duration, startprepare = 0, state = 0 , repeated = 0, justplay= 0, eventId = -1, afterevent = 0, dirname = "", description = description, type = typedata))
-	return E1TimerList
-
-class myHTTPClientFactory(HTTPClientFactory):
-	def __init__(self, url, method='GET', postdata=None, headers=None,
-	agent="Twisted Remotetimer", timeout=0, cookies=None,
-	followRedirect=1, lastModified=None, etag=None):
-		HTTPClientFactory.__init__(self, url, method=method, postdata=postdata,
-		headers=headers, agent=agent, timeout=timeout, cookies=cookies,followRedirect=followRedirect)
-
-
-def sendPartnerBoxWebCommand(url, contextFactory=None, timeout=60, username = "root", password = "", *args, **kwargs):
+	
+def sendPartnerBoxWebCommand(url, timeout=60, username = "root", password = "", webiftype="standard", *args, **kwargs):
 	scheme, host, port, path = url_parse(url)
-	basicAuth = encodestring(("%s:%s")%(username,password))
-	authHeader = "Basic " + basicAuth.strip()
-	AuthHeaders = {"Authorization": authHeader}
-	if kwargs.has_key("headers"):
-		kwargs["headers"].update(AuthHeaders)
-	else:
-		kwargs["headers"] = AuthHeaders
-	factory = myHTTPClientFactory(url, *args, **kwargs)
-	reactor.connectTCP(host, port, factory, timeout=timeout)
-	return factory.deferred
+	
+	if webiftype == "openwebif":
+		d = myconnector.runCommand(path, username, password, host, port, "0")
+		
+		def returnResult(result):
+			return result
+			
+		d.addCallback(returnResult)
+		
+		def returnError(error):
+			print "[Partnerbox] - Error in sendPartnerBoxWebCommand", error.getErrorMessage()
+			return error
+		
+		d.addErrback(returnError)
+		
+		return d
+	else:			
+		d = myconnector.getSessionId(username, password, host, port)
+	
+		def extractSessionId(result):
+			print "[Partnerbox] - got session"
+			sessionId = result
+	
+			e = myconnector.runCommand(path, username,password,host,port, sessionId)
+		
+			def returnResult(result):
+				return result
+		
+			e.addCallback(returnResult)
+			
+			def returnError(error):
+				print "[Partnerbox] - Error in sendPartnerBoxWebCommand", error.getErrorMessage()
+				return error
+			
+			e.addErrback(returnError)
+		
+			return e
+	
+		d.addCallback(extractSessionId)
+	
+		def returnError(error):
+			print "[Partnerbox] - Error in getSessionId", error
+		
+			return error
+		
+		d.addErrback(returnError)
+	
+		return d
 
 class PlaylistEntry:
 
@@ -285,9 +278,7 @@ class PlaylistEntry:
 	Fr=16777216
 	Sa=33554432
 
-
 def SetPartnerboxTimerlist(partnerboxentry = None, sreference = None):
-	global remote_timer_list
 	global CurrentIP
 	if partnerboxentry is None:
 		return	
@@ -297,18 +288,18 @@ def SetPartnerboxTimerlist(partnerboxentry = None, sreference = None):
 		CurrentIP = partnerboxentry.ip.value
 		ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 		port = partnerboxentry.port.value
-		if int(partnerboxentry.enigma.value) == 0:
-			sCommand = "http://%s:%s@%s:%d/web/timerlist" % (username, password, ip,port)
-		else:
-			sCommand = "http://%s:%s@%s:%d/xml/timers" % (username, password, ip,port)
+		sCommand = "http://%s:%d/web/timerlist" % (ip,port)
+		sendPartnerBoxWebCommand(sCommand, 3, username, password).addCallback(boundFunction(setTimerListCallback, sreference = sreference)).addErrback(setTimerListErrorCallbackError)
 		print "[RemoteEPGList] Getting timerlist data from %s..."%ip
-		f = urllib.urlopen(sCommand)
-		sxml = f.read()
-		if int(partnerboxentry.enigma.value) == 0:
-			remote_timer_list = FillE2TimerList(sxml, sreference)
-		else:
-			remote_timer_list = FillE1TimerList(sxml, sreference)
-	except: pass
+		
+	except Exception,e: print str(e)
+
+def setTimerListCallback(result, sreference = None):
+	global remote_timer_list
+	remote_timer_list = FillE2TimerList(result, sreference)
+	
+def setTimerListErrorCallbackError(error):
+	print error.getErrorMessage()
 
 def getServiceRef(sreference):
 	serviceref = sreference

@@ -4,7 +4,7 @@
 #  $Id$
 #
 #  Coded by Dr.Best (c) 2009
-#  Support: www.dreambox-tools.info
+#  Support: board.dreambox-tools.info
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -35,10 +35,10 @@ def initPartnerboxEntryConfig():
 	config.plugins.Partnerbox.Entries[i].name = ConfigText(default = "dreambox", visible_width = 50, fixed_size = False)
 	config.plugins.Partnerbox.Entries[i].ip = ConfigIP(default = [192,168,0,98])
 	config.plugins.Partnerbox.Entries[i].port = ConfigInteger(default=80, limits=(1, 65555))
-	config.plugins.Partnerbox.Entries[i].enigma = ConfigSelection(default="0", choices = [("0", _("Enigma 2")),("1", _("Enigma 1"))])
 	config.plugins.Partnerbox.Entries[i].password = ConfigText(default = "dreambox", visible_width = 50, fixed_size = False)
 	config.plugins.Partnerbox.Entries[i].useinternal = ConfigSelection(default="1", choices = [("0", _("use external")),("1", _("use internal"))])
 	config.plugins.Partnerbox.Entries[i].zaptoservicewhenstreaming = ConfigYesNo(default = True)
+	config.plugins.Partnerbox.Entries[i].webinterfacetype = ConfigSelection(default="standard", choices = [("standard", _("Standard")), ("openwebif", _("OpenWebif"))])
 	return config.plugins.Partnerbox.Entries[i]
 
 def initConfig():
@@ -72,8 +72,6 @@ class PartnerboxSetup(ConfigListScreen, Screen):
 
 		self.list = [ ]
 		self.list.append(getConfigListEntry(_("Show 'RemoteTimer' in E-Menu"), config.plugins.Partnerbox.showremotetimerinextensionsmenu))
-		self.list.append(getConfigListEntry(_("Show 'RemoteTV Player' in E-Menu"), config.plugins.Partnerbox.showremotetvinextensionsmenu))
-		self.list.append(getConfigListEntry(_("Show 'Stream current Service' in E-Menu"), config.plugins.Partnerbox.showcurrentstreaminextensionsmenu))
 		self.list.append(getConfigListEntry(_("Enable Partnerbox-Function in TimerEvent"), config.plugins.Partnerbox.enablepartnerboxintimerevent))
 		self.list.append(getConfigListEntry(_("Enable Partnerbox-Function in EPGList"), config.plugins.Partnerbox.enablepartnerboxepglist))
 		self.list.append(getConfigListEntry(_("Enable first Partnerbox-entry in Timeredit as default"), config.plugins.Partnerbox.enabledefaultpartnerboxintimeredit))
@@ -107,8 +105,6 @@ class PartnerboxEntriesListConfigScreen(Screen):
 			<widget name="name" position="10,60" size="250,25" font="Regular;20" halign="left"/>
 			<widget name="ip" position="275,60" size="190,25" font="Regular;20" halign="left"/>
 			<widget name="port" position="460,60" size="120,25" font="Regular;20" halign="left"/>
-			<widget name="type" position="580,60" size="160,25" font="Regular;20" halign="left"/>
-
 			<ePixmap name="red" pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" alphatest="on"/>
 			<ePixmap name="yellow" pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" alphatest="on"/>
 			<ePixmap name="blue" pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" alphatest="on"/>
@@ -125,7 +121,6 @@ class PartnerboxEntriesListConfigScreen(Screen):
 		self["name"] = Button(_("Name"))
 		self["ip"] = Button(_("IP"))
 		self["port"] = Button(_("Port"))
-		self["type"] = Button(_("Enigma Type"))
 		self["key_red"] = Button(_("Add"))
 		self["key_yellow"] = Button(_("Edit"))
 		self["key_blue"] = Button(_("Delete"))
@@ -213,11 +208,6 @@ class PartnerboxEntryList(MenuList):
 			res.append((eListboxPythonMultiContent.TYPE_TEXT, 10+nameWidth, 0, ipWidth, configEntryHeight, 0, RT_HALIGN_LEFT|RT_VALIGN_CENTER, str(ip)))
 			port = "%d"%(c.port.value)
 			res.append((eListboxPythonMultiContent.TYPE_TEXT, 15+nameWidth+ipWidth, 0, portWidth, configEntryHeight, 0, RT_HALIGN_LEFT|RT_VALIGN_CENTER, str(port)))
-			if int(c.enigma.value) == 0:
-				e_type = "Enigma2"
-			else:
-				e_type = "Enigma1"
-			res.append((eListboxPythonMultiContent.TYPE_TEXT, 15+nameWidth+ipWidth+portWidth, 0, enigmaWidth, configEntryHeight, 0, RT_HALIGN_LEFT|RT_VALIGN_CENTER, str(e_type)))
 			self.list.append(res)
 		self.l.setList(self.list)
 		self.moveToIndex(0)
@@ -262,8 +252,8 @@ class PartnerboxEntryConfigScreen(ConfigListScreen, Screen):
 			getConfigListEntry(_("Name"), self.current.name),
 			getConfigListEntry(_("IP"), self.current.ip),
 			getConfigListEntry(_("Port"), self.current.port),
-			getConfigListEntry(_("Enigma Type"), self.current.enigma),
 			getConfigListEntry(_("Password"), self.current.password),
+			getConfigListEntry(_("Webinterface Type"), self.current.webinterfacetype),
 			getConfigListEntry(_("Servicelists/EPG"), self.current.useinternal),
 			getConfigListEntry(_("Zap to service when streaming"), self.current.zaptoservicewhenstreaming)
 		]

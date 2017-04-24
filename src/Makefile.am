@@ -10,7 +10,8 @@ plugin_PYTHON = \
 	RemoteTimerEntry.py \
 	Services.py \
 	__init__.py \
-	plugin.py
+	plugin.py \
+	connector.py
 
 plugin_DATA = \
 	ExPlayer.png \

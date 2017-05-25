@@ -135,7 +135,6 @@ def GetPartnerboxTimerlist(self):
 		port = self.partnerboxentry.port.value
 		http = "http://%s:%d" % (ip,port)
 		sCommand = http + "/web/timerlist"
-		print "[Partnerbox] %s"%sCommand
 		sendPartnerBoxWebCommand(sCommand, 3, "root", self.partnerboxentry.password.value, self.partnerboxentry.webinterfacetype.value).addCallback(boundFunction(self.GetPartnerboxTimerlistCallback)).addErrback(boundFunction(self.GetPartnerboxTimerlistCallbackError))
 
 def GetPartnerboxTimerlistCallback(self, result):
@@ -145,7 +144,6 @@ def GetPartnerboxTimerlistCallback(self, result):
 		if self.type == EPG_TYPE_SINGLE and self.filterRef:
 			curService = self.currentService.ref.toString()
 		partnerboxfunctions.remote_timer_list = FillE2TimerList(sxml, curService)
-	#if len(partnerboxfunctions.remote_timer_list) != 0:
 	Partnerbox_onSelectionChanged(self)
 	self["list"].l.invalidate()
 

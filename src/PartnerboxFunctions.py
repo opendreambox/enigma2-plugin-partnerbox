@@ -23,10 +23,10 @@ import xml.etree.cElementTree
 import urlparse
 import connector as myconnector
 from Tools.BoundFunction import boundFunction
+from ServiceReference import ServiceReference
 
 CurrentIP = None
 remote_timer_list = None
-oldIP = None
 
 def url_parse(url, defaultPort=None):
 	parsed = urlparse.urlparse(url)
@@ -106,7 +106,7 @@ def isInTimerList(begin, duration, service, eventid, timer_list):
 	return timerentry
 
 class E2Timer:
-	def __init__(self, servicereference = "", servicename = "", name = "", disabled = 0, timebegin = 0, timeend = 0, duration = 0, startprepare = 0, state = 0, repeated = 0, justplay = 0, eventId = 0, afterevent = 0, dirname = "", description = "", type = 0):
+	def __init__(self, servicereference = "", servicename = "", name = "", disabled = 0, timebegin = 0, timeend = 0, duration = 0, startprepare = 0, state = 0, repeated = 0, justplay = 0, eventId = 0, afterevent = 0, dirname = "", description = ""):
 		self.servicereference = servicereference
 		self.servicename = servicename
 		self.name = name
@@ -119,11 +119,20 @@ class E2Timer:
 		self.repeated = repeated
 		self.justplay = justplay
 		self.eventId = eventId
-		self.afterevent = afterevent
+		self.afterEvent = afterevent
 		self.dirname = dirname
 		self.description = description
-		self.type = type
-
+		###### added to make it work with TimerEdit
+		self.begin = timebegin
+		self.end = timeend
+		self.tags = []
+		self.service_ref = ServiceReference(servicereference)
+		self.repeatedbegindate = 0
+		self.plugins = {}
+	
+	def isRunning(self):
+		return self.state == 2
+	
 def FillE2TimerList(xmlstring, sreference = None):
 	E2TimerList = []
 	try: root = xml.etree.cElementTree.fromstring(xmlstring)
@@ -186,8 +195,7 @@ def FillE2TimerList(xmlstring, sreference = None):
 				eventId = eventId,
 				afterevent = afterevent,
 				dirname = str(timer.findtext("e2location", '').encode("utf-8", 'ignore')),
-				description = str(timer.findtext("e2description", '').encode("utf-8", 'ignore')),
-				type = 0))
+				description = str(timer.findtext("e2description", '').encode("utf-8", 'ignore'))))
 	return E2TimerList
 	
 def sendPartnerBoxWebCommand(url, timeout=60, username = "root", password = "", webiftype="standard", *args, **kwargs):
@@ -240,43 +248,6 @@ def sendPartnerBoxWebCommand(url, timeout=60, username = "root", password = "", 
 		d.addErrback(returnError)
 	
 		return d
-
-class PlaylistEntry:
-
-	PlaylistEntry=1			# normal PlaylistEntry (no Timerlist entry)
-	SwitchTimerEntry=2		#simple service switch timer
-	RecTimerEntry=4			#timer do recording
-	
-	recDVR=8				#timer do DVR recording
-	recVCR=16				#timer do VCR recording (LIRC) not used yet
-	recNgrab=131072			#timer do record via Ngrab Server
-
-	stateWaiting=32			#timer is waiting
-	stateRunning=64			#timer is running
-	statePaused=128			#timer is paused
-	stateFinished=256		#timer is finished
-	stateError=512			#timer has error state(s)
-
-	errorNoSpaceLeft=1024	#HDD no space Left ( recDVR )
-	errorUserAborted=2048	#User Action aborts this event
-	errorZapFailed=4096		#Zap to service failed
-	errorOutdated=8192		#Outdated event
-
-	boundFile=16384			#Playlistentry have an bounded file
-	isSmartTimer=32768		#this is a smart timer (EIT related) not uses Yet
-	isRepeating=262144		#this timer is repeating
-	doFinishOnly=65536		#Finish an running event/action
-
-	doShutdown=67108864		#timer shutdown the box
-	doGoSleep=134217728		#timer set box to standby
-
-	Su=524288
-	Mo=1048576
-	Tue=2097152
-	Wed=4194304
-	Thu=8388608
-	Fr=16777216
-	Sa=33554432
 
 def SetPartnerboxTimerlist(partnerboxentry = None, sreference = None):
 	global CurrentIP

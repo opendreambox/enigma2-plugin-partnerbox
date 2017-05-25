@@ -23,17 +23,11 @@ from ServiceReference import ServiceReference
 from Components.config import config, ConfigSelection, ConfigText, ConfigSubList, ConfigDateTime, ConfigClock, ConfigYesNo, getConfigListEntry
 from Components.ActionMap import NumberActionMap
 from Components.ConfigList import ConfigListScreen
-from Components.MenuList import MenuList
-from Components.Button import Button
 from Components.Label import Label
 from Components.Pixmap import Pixmap
-from Screens.MovieSelection import getPreferredTagEditor
-from Screens.LocationBox import MovieLocationBox
-from Screens.ChoiceBox import ChoiceBox
 from RecordTimer import AFTEREVENT
-from Tools.Directories import resolveFilename, SCOPE_HDD
 from enigma import eEPGCache
-from time import localtime, mktime, time, strftime
+from time import localtime, mktime, strftime
 from datetime import datetime
 from Screens.TimerEntry import TimerEntry
 from Screens.MessageBox import MessageBox
@@ -41,14 +35,14 @@ from Tools.BoundFunction import boundFunction
 import urllib
 
 import xml.etree.cElementTree
-from Components.ActionMap import ActionMap
 
-from PartnerboxFunctions import PlaylistEntry, sendPartnerBoxWebCommand, getServiceRef, SetPartnerboxTimerlist
+from PartnerboxFunctions import sendPartnerBoxWebCommand, getServiceRef, SetPartnerboxTimerlist
 import PartnerboxFunctions as partnerboxfunctions
+from time import localtime
 
 class RemoteTimerEntry(Screen, ConfigListScreen):
 	skin = """
-		<screen name="RemoteTimerEntry" position="center,center" size="820,420" title="Timer entry">
+		<screen name="RemoteTimerEntry" position="center,center" size="820,420" title="Remote timer entry">
 			<widget name="cancel" pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" alphatest="on" />
 			<widget name="ok" pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" alphatest="on" />
 			<widget name="canceltext" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
@@ -57,13 +51,17 @@ class RemoteTimerEntry(Screen, ConfigListScreen):
 			<widget name="config" position="10,60" size="800,330" enableWrapAround="1" scrollbarMode="showOnDemand" />
 		</screen>"""
 
-	def __init__(self, session, timer, Locations):
+	def __init__(self, session, timer, Locations, partnerboxentry=None):
 		self.session = session
 		Screen.__init__(self, session)
 		self.timer = timer
 		self.Locations = Locations
+	
 		self.entryDate = None
 		self.entryService = None
+		self.partnerboxentry = partnerboxentry
+		if self.partnerboxentry is not None:
+			self.setTitle("Remote timer entry %s" %(self.partnerboxentry.name.value))
 		self["oktext"] = Label(_("OK"))
 		self["canceltext"] = Label(_("Cancel"))
 		self["ok"] = Pixmap()
@@ -84,30 +82,14 @@ class RemoteTimerEntry(Screen, ConfigListScreen):
 
 	def createConfig(self):
 		
-		if self.timer.type == 0:
-			justplay = self.timer.justplay
-			afterevent = {
-				0: "nothing",
-				2: "deepstandby",
-				1: "standby",
-				3: "auto"
-				}[self.timer.afterevent]
-		else:
-			if self.timer.type & PlaylistEntry.doShutdown:
-				afterevent = PlaylistEntry.doShutdown
-			elif self.timer.type & PlaylistEntry.doGoSleep:
-				afterevent = PlaylistEntry.doGoSleep
-			else:
-				afterevent = 0
-		
-			if self.timer.type & PlaylistEntry.RecTimerEntry:
-				if self.timer.type & PlaylistEntry.recDVR:
-					justplay = PlaylistEntry.recDVR
-				elif self.timer.type & PlaylistEntry.recNgrab:
-					justplay = PlaylistEntry.recNgrab
-			elif self.timer.type & PlaylistEntry.SwitchTimerEntry:
-				justplay = PlaylistEntry.SwitchTimerEntry
-		
+		justplay = self.timer.justplay
+		afterevent = {
+			0: "nothing",
+			2: "deepstandby",
+			1: "standby",
+			3: "auto"
+			}[self.timer.afterEvent]
+				
 		weekday_table = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 		day = []
 		weekday = 0
@@ -119,27 +101,24 @@ class RemoteTimerEntry(Screen, ConfigListScreen):
 		day[weekday] = 1
 		name = self.timer.name 
 		description = self.timer.description
-		if self.timer.type == 0:
-			self.timerentry_justplay = ConfigSelection(choices = [("1", _("zap")), ("0", _("record"))], default = str(justplay))
-			self.timerentry_afterevent = ConfigSelection(choices = [("nothing", _("do nothing")), ("standby", _("go to standby")), ("deepstandby", _("go to deep standby")), ("auto", _("auto"))], default = afterevent)
-			self.timerentry_name = ConfigText(default = name, visible_width = 50, fixed_size = False)
-		else:
-			self.timerentry_justplay = ConfigSelection(choices = [(str(PlaylistEntry.SwitchTimerEntry), _("zap")), (str(PlaylistEntry.recNgrab), _("NGRAB")),(str(PlaylistEntry.recDVR), _("DVR"))], default = str(justplay))
-			self.timerentry_afterevent = ConfigSelection(choices = [("0", _("do nothing")), (str(PlaylistEntry.doGoSleep), _("go to standby")), (str(PlaylistEntry.doShutdown), _("go to deep standby"))], default = str(afterevent))
+		self.timerentry_justplay = ConfigSelection(choices = [("1", _("zap")), ("0", _("record"))], default = str(justplay))
+		self.timerentry_afterevent = ConfigSelection(choices = [("nothing", _("do nothing")), ("standby", _("go to standby")), ("deepstandby", _("go to deep standby")), ("auto", _("auto"))], default = afterevent)
+		self.timerentry_name = ConfigText(default = name, visible_width = 50, fixed_size = False)
 		self.timerentry_description = ConfigText(default = description, visible_width = 50, fixed_size = False)
 		self.timerentry_date = ConfigDateTime(default = begin, formatstring = _("%d.%B %Y"), increment = 86400)
 		self.timerentry_starttime = ConfigClock(default = begin)
 		self.timerentry_endtime = ConfigClock(default = end)
-		if self.timer.type == 0:
-			default = self.timer.dirname
-			if default == "None":
-				if self.Locations:
-					default = self.Locations[0]
-				else:
-					default = "N/A"
-			if default not in self.Locations:
-				self.Locations.append(default)
-			self.timerentry_dirname = ConfigSelection(default = default, choices = self.Locations)
+		self.timerentry_showendtime = ConfigSelection(default = ((self.timer.end - self.timer.begin) > 4), choices = [(True, _("yes")), (False, _("no"))])		
+		#if self.timer.type == 0:
+		default = self.timer.dirname
+		if default == "None":
+			if self.Locations:
+				default = self.Locations[0]
+			else:
+				default = "N/A"
+		if default not in self.Locations:
+			self.Locations.append(default)
+		self.timerentry_dirname = ConfigSelection(default = default, choices = self.Locations)
 		self.timerentry_weekday = ConfigSelection(default = weekday_table[weekday], choices = [("mon",_("Monday")), ("tue", _("Tuesday")), ("wed",_("Wednesday")), ("thu", _("Thursday")), ("fri", _("Friday")), ("sat", _("Saturday")), ("sun", _("Sunday"))])
 		self.timerentry_day = ConfigSubList()
 		for x in (0, 1, 2, 3, 4, 5, 6):
@@ -149,8 +128,7 @@ class RemoteTimerEntry(Screen, ConfigListScreen):
 
 	def createSetup(self, widget):
 		self.list = []
-		if self.timer.type == 0:
-			self.list.append(getConfigListEntry(_("Name"), self.timerentry_name))
+		self.list.append(getConfigListEntry(_("Name"), self.timerentry_name))
 		self.list.append(getConfigListEntry(_("Description"), self.timerentry_description))
 		self.timerJustplayEntry = getConfigListEntry(_("Timer Type"), self.timerentry_justplay)
 		self.list.append(self.timerJustplayEntry)
@@ -158,38 +136,44 @@ class RemoteTimerEntry(Screen, ConfigListScreen):
 		self.list.append(self.entryDate)
 		self.entryStartTime = getConfigListEntry(_("StartTime"), self.timerentry_starttime)
 		self.list.append(self.entryStartTime)
-		if self.timer.type == 0:
-			if int(self.timerentry_justplay.value) != 1:
-				self.entryEndTime = getConfigListEntry(_("EndTime"), self.timerentry_endtime)
-				self.list.append(self.entryEndTime)
-			else:
-				self.entryEndTime = None
+		self.entryShowEndTime = getConfigListEntry(_("Set End Time"), self.timerentry_showendtime)
+		if self.timerentry_justplay.value == "1":
+			self.list.append(self.entryShowEndTime)
+		self.entryEndTime = getConfigListEntry(_("EndTime"), self.timerentry_endtime)	
+		if self.timerentry_justplay.value != "1" or self.timerentry_showendtime.value:
+			self.list.append(self.entryEndTime)			
 		else:
-			self.entryEndTime = getConfigListEntry(_("EndTime"), self.timerentry_endtime)
-			self.list.append(self.entryEndTime)
+			self.entryEndTime = None
 		self.channelEntry = getConfigListEntry(_("Channel"), self.timerentry_service)
 		self.list.append(self.channelEntry)
-		if self.timer.type == 0:
-			self.dirname = getConfigListEntry(_("Location"), self.timerentry_dirname)
-			if int(self.timerentry_justplay.value) != 1:
-				self.list.append(self.dirname)
-				self.list.append(getConfigListEntry(_("After event"), self.timerentry_afterevent))
-		else:
+		self.dirname = getConfigListEntry(_("Location"), self.timerentry_dirname)
+		if int(self.timerentry_justplay.value) != 1:
+			self.list.append(self.dirname)
 			self.list.append(getConfigListEntry(_("After event"), self.timerentry_afterevent))
 		self[widget].list = self.list
 		self[widget].l.setList(self.list)
 		
 	def newConfig(self):
-		if self["config"].getCurrent() == self.timerJustplayEntry:
+		if self["config"].getCurrent() in (self.timerJustplayEntry, self.entryShowEndTime):
 			self.createSetup("config")
 			
 	def keyLeft(self):
-		ConfigListScreen.keyLeft(self)
-		self.newConfig()
+		if self["config"].getCurrent() == self.channelEntry and self.partnerboxentry is not None:
+			from plugin import PartnerBouquetList
+			self.session.openWithCallback(boundFunction(PartnerBouquetListCallback,self), PartnerBouquetList, [], self.partnerboxentry, 0, 0)
+		elif self["config"].getCurrent() == self.timerentry_name:
+			pass
+		else:
+			ConfigListScreen.keyLeft(self)
+			self.newConfig()
 
 	def keyRight(self):
-		ConfigListScreen.keyRight(self)
-		self.newConfig()
+		if self["config"].getCurrent() == self.channelEntry and self.partnerboxentry is not None:
+			from plugin import PartnerBouquetList
+			self.session.openWithCallback(boundFunction(PartnerBouquetListCallback,self), PartnerBouquetList, [], self.partnerboxentry, 0, 0)
+		else:	
+			ConfigListScreen.keyRight(self)
+			self.newConfig()
 		
 	def getTimestamp(self, date, mytime):
 		d = localtime(date)
@@ -210,20 +194,16 @@ class RemoteTimerEntry(Screen, ConfigListScreen):
 		self.close((False,))
 		
 	def keyGo(self):
-		if self.timer.type == 0:
-			self.timer.name = self.timerentry_name.value
-			self.timer.dirname = self.timerentry_dirname.value
-			self.timer.afterevent = {
-			"nothing": 0,
-			"deepstandby": 2,
-			"standby": 1,
-			"auto": 3
-			}[self.timerentry_afterevent.value]
-		else:
-			self.timer.afterevent = int(self.timerentry_afterevent.value)
+		self.timer.name = self.timerentry_name.value
+		self.timer.dirname = self.timerentry_dirname.value
+		self.timer.afterEvent = {
+		"nothing": 0,
+		"deepstandby": 2,
+		"standby": 1,
+		"auto": 3
+		}[self.timerentry_afterevent.value]
 		self.timer.description = self.timerentry_description.value
 		self.timer.justplay = int(self.timerentry_justplay.value)
-		
 		self.timer.timebegin, self.timer.timeend = self.getBeginEnd()
 		self.close((True, self.timer))
 
@@ -244,9 +224,7 @@ class RemoteTimerEntry(Screen, ConfigListScreen):
 		if self.entryEndTime is not None:
 			self.timerentry_endtime.decrement()
 			self["config"].invalidate(self.entryEndTime)
-			
-			
-			
+	
 # ##########################################
 # TimerEntry
 # ##########################################
@@ -311,18 +289,18 @@ def RemoteTimerConfig(self):
 #	RemoteTimercreateConfig(self)
 #	RemoteTimerCreateSetup(self,"config")
 
-def getLocations(self, url, check):
+def getLocations(self, url, partnerboxentry, check, mode="new"):
 	try:
-		sendPartnerBoxWebCommand(url, 3, "root", self.entryguilist[int(self.timerentry_remote.value)][2].password.value, self.entryguilist[int(self.timerentry_remote.value)][2].webinterfacetype.value).addCallback(boundFunction(getLocationsCallback,self, check = check)).addErrback(boundFunction(getLocationsCallbackError,self))
-	except: pass
+		self.partnerboxentry = partnerboxentry
+		sendPartnerBoxWebCommand(url, 3, "root", self.partnerboxentry.password.value, self.partnerboxentry.webinterfacetype.value).addCallback(boundFunction(getLocationsCallback,self, check = check, mode = mode)).addErrback(boundFunction(getLocationsCallbackError,self))
+	except Exception, e:
+		print e
 
 def getLocationsCallbackError(self, error):
-	print error.getErrorMessage()
 	msg = self.session.open(MessageBox, error.getErrorMessage(), MessageBox.TYPE_ERROR)
 	msg.setTitle(_("Partnerbox"))
-	
 		
-def getLocationsCallback(self, xmlstring, check = False):
+def getLocationsCallback(self, xmlstring, check = False, mode = "new"):
 	try: root = xml.etree.cElementTree.fromstring(xmlstring)
 	except: return 
 	for location in root.findall("e2location"):
@@ -340,14 +318,18 @@ def getLocationsCallback(self, xmlstring, check = False):
 		
 	# new as everything is async now	
 	if len(self.Locations) == 0:
-		ip = "%d.%d.%d.%d" % tuple(self.entryguilist[int(self.timerentry_remote.value)][2].ip.value)
-		port = self.entryguilist[int(self.timerentry_remote.value)][2].port.value
+		ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
+		port = self.partnerboxentry.port.value
 		http_ = "%s:%d" % (ip,port)
 		
-		getLocations(self, "http://" + http_ + "/web/getcurrlocation", True)
+		getLocations(self, "http://" + http_ + "/web/getcurrlocation", self.partnerboxentry, True)
 	else:
-		RemoteTimercreateConfig(self)
-		RemoteTimerCreateSetup(self,"config")
+		if mode == "new":
+			RemoteTimercreateConfig(self)
+			RemoteTimerCreateSetup(self,"config")
+		else:
+			from plugin import RemoteTimerList
+			RemoteTimerList.openEditCallback(self)
 		
 def createRemoteTimerSetup(self, widget):
 	baseTimerEntrySetup(self, widget)
@@ -358,15 +340,23 @@ def createRemoteTimerSetup(self, widget):
 	
 def RemoteTimerkeyLeft(self):
 	if int(self.timerentry_remote.value) != 0:
-		ConfigListScreen.keyLeft(self)
-		RemoteTimernewConfig(self)
+		if self["config"].getCurrent() == self.channelEntry:
+			from plugin import PartnerBouquetList
+			self.session.openWithCallback(boundFunction(PartnerBouquetListCallback,self), PartnerBouquetList, [], self.entryguilist[int(self.timerentry_remote.value)][2], 0, 0)
+		else:
+			ConfigListScreen.keyLeft(self)
+			RemoteTimernewConfig(self)
 	else:
 		baseTimerkeyLeft(self)
 
 def RemoteTimerkeyRight(self):
 	if int(self.timerentry_remote.value) != 0:
-		ConfigListScreen.keyRight(self)
-		RemoteTimernewConfig(self)
+		if self["config"].getCurrent() == self.channelEntry:
+			from plugin import PartnerBouquetList
+			self.session.openWithCallback(boundFunction(PartnerBouquetListCallback,self), PartnerBouquetList, [], self.entryguilist[int(self.timerentry_remote.value)][2], 0, 0)
+		else:
+			ConfigListScreen.keyRight(self)
+			RemoteTimernewConfig(self)
 	else:
 		baseTimerkeyRight(self)
 
@@ -376,16 +366,14 @@ def RemoteTimerkeySelect(self):
 	else:
 		baseTimerkeySelect(self)
 	
-	
 def RemoteTimernewConfig(self):
 	if self["config"].getCurrent() == self.timerRemoteEntry:
 		if int(self.timerentry_remote.value) != 0:
-			self.timertype = 0
 			ip = "%d.%d.%d.%d" % tuple(self.entryguilist[int(self.timerentry_remote.value)][2].ip.value)
 			port = self.entryguilist[int(self.timerentry_remote.value)][2].port.value
 			http_ = "%s:%d" % (ip,port)
 			self.Locations = []
-			getLocations(self, "http://" + http_ + "/web/getlocations", False)
+			getLocations(self, "http://" + http_ + "/web/getlocations", self.entryguilist[int(self.timerentry_remote.value)][2], False)
 		else:
 			baseTimercreateConfig(self)
 			createRemoteTimerSetup(self, "config")
@@ -398,7 +386,7 @@ def RemoteTimernewConfig(self):
 			if int(self.timerentry_remote.value) == 0:
 				baseTimerEntrynewConfig(self)
 	
-def  RemoteTimercreateConfig(self):
+def RemoteTimercreateConfig(self):
 	justplay = self.timer.justplay
 	afterevent = {
 		AFTEREVENT.NONE: "nothing",
@@ -415,8 +403,23 @@ def  RemoteTimercreateConfig(self):
 	end = self.timer.end
 	weekday = (int(strftime("%w", localtime(begin))) - 1) % 7
 	day[weekday] = 1
-	name = self.timer.name 
-	description = self.timer.description
+
+	event = None
+	if self.timer.eit:
+		event =  eEPGCache.getInstance().lookupEventId(self.timer.service_ref.ref, self.timer.eit)
+
+	if self.timer.name != "":
+		name = self.timer.name 
+	elif event is not None:
+		name = event.getEventName()		
+	else:
+		name = ""
+	if self.timer.description != "":
+		description = self.timer.description
+	elif event is not None:
+		description = event.getShortDescription()
+	else:
+		description = ""
 	self.timerentry_justplay = ConfigSelection(choices = [("zap", _("zap")), ("record", _("record"))], default = {0: "record", 1: "zap"}[justplay])
 	self.timerentry_afterevent = ConfigSelection(choices = [("nothing", _("do nothing")), ("standby", _("go to standby")), ("deepstandby", _("go to deep standby")), ("auto", _("auto"))], default = afterevent)
 	self.timerentry_name = ConfigText(default = name, visible_width = 50, fixed_size = False)
@@ -424,6 +427,7 @@ def  RemoteTimercreateConfig(self):
 	self.timerentry_date = ConfigDateTime(default = begin, formatstring = _("%d.%B %Y"), increment = 86400)
 	self.timerentry_starttime = ConfigClock(default = begin)
 	self.timerentry_endtime = ConfigClock(default = end)
+	self.timerentry_showendtime = ConfigSelection(default = ((self.timer.end - self.timer.begin) > 4), choices = [(True, _("yes")), (False, _("no"))])	
 
 	if self.Locations:
 		default = self.Locations[0]
@@ -457,8 +461,12 @@ def RemoteTimerCreateSetup(self, widget):
 	self.list.append(self.entryDate)
 	self.entryStartTime = getConfigListEntry(_("StartTime"), self.timerentry_starttime)
 	self.list.append(self.entryStartTime)
-	if self.timerentry_justplay.value != "zap":
-		self.entryEndTime = getConfigListEntry(_("EndTime"), self.timerentry_endtime)
+	
+	self.entryShowEndTime = getConfigListEntry(_("Set End Time"), self.timerentry_showendtime)	
+	if self.timerentry_justplay.value == "zap":
+		self.list.append(self.entryShowEndTime)
+	self.entryEndTime = getConfigListEntry(_("EndTime"), self.timerentry_endtime)
+	if self.timerentry_justplay.value != "zap" or self.timerentry_showendtime.value:
 		self.list.append(self.entryEndTime)
 	else:
 		self.entryEndTime = None
@@ -469,8 +477,22 @@ def RemoteTimerCreateSetup(self, widget):
 		self.list.append(self.dirname)
 		self.list.append(getConfigListEntry(_("After event"), self.timerentry_afterevent))
 	self[widget].list = self.list
+		
 	self[widget].l.setList(self.list)
 
+def PartnerBouquetListCallback(self, result):
+	if result and result[1] and len(result[1])>0:
+		self.timerentry_service_ref =  ServiceReference(result[1][0].servicereference)
+		self.timerentry_service.setCurrentText(result[1][0].servicename)
+		self.timerentry_name.value = result[1][0].eventtitle
+		self.timerentry_description.value = result[1][0].eventdescription
+		self.timerentry_date.value = result[1][0].eventstart
+		t = localtime(result[1][0].eventstart)
+		self.timerentry_starttime.value = [t.tm_hour, t.tm_min]
+		t = localtime(result[1][0].eventstart+result[1][0].eventduration)
+		self.timerentry_endtime.value = [t.tm_hour, t.tm_min]
+		self["config"].invalidate(self.channelEntry)
+		
 def RemoteTimerGo(self):
 	if int(self.timerentry_remote.value) == 0:
 		baseTimerEntryGo(self)
@@ -500,7 +522,7 @@ def RemoteTimerGo(self):
 			if service_ref.getPath(): # partnerbox service ?
 				service_ref = getServiceRef(service_ref.ref.toString())
 
-			sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&eit=0&justplay=%d&afterevent=%s" % (http, service_ref,begin,end,name,descr,dirname,justplay,afterevent)
+			sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&eit=0&justplay=%d&afterevent=%s" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname),justplay,afterevent)
 			sendPartnerBoxWebCommand(sCommand, 3, "root", str(self.entryguilist[int(self.timerentry_remote.value)][2].password.value), self.entryguilist[int(self.timerentry_remote.value)][2].webinterfacetype.value).addCallback(boundFunction(AddTimerE2Callback,self, self.session)).addErrback(boundFunction(AddTimerError,self,self.session))
 
 def AddTimerE2Callback(self, session, answer):
@@ -522,4 +544,10 @@ def AddTimerE2Callback(self, session, answer):
 
 def AddTimerError(self, session, error):
 	session.open(MessageBox,str(error.getErrorMessage()),MessageBox.TYPE_INFO)
+	
+		
+		
+
+
+
 

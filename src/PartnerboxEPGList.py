@@ -104,7 +104,6 @@ def Partnerbox_SingleEntry(self, service, eventId, beginTime, duration, EventNam
 		res.append((eListboxPythonMultiContent.TYPE_TEXT, r3.left(), r3.top(), r3.width(), r3.height(), 0, RT_HALIGN_LEFT|RT_VALIGN_CENTER, EventName))
 	return res
 
-
 def Partnerbox_SimilarEntry(self, service, eventId, beginTime, service_name, duration):
 	rec1=beginTime and (self.timer.isInTimer(eventId, beginTime, duration, service))
 	rec2=beginTime and (isInRemoteTimer(self,beginTime, duration, service))
@@ -188,8 +187,6 @@ def Partnerbox_MultiEntry(self, changecount, service, eventId, begTime, duration
 			))
 	return res
 
-
-
 def isInRemoteTimer(self, begin, duration, service):
 	time_match = 0
 	chktime = None
@@ -224,7 +221,6 @@ def isInRemoteTimer(self, begin, duration, service):
 			if time_match:
 				break
 	return time_match
-
 
 def getRemoteClockPixmap(self, refstr, beginTime, duration, eventId):
 	serviceref = getServiceRef(refstr)

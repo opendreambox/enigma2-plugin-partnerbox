@@ -17,16 +17,15 @@
 #  GNU General Public License for more details.
 #
 
-from enigma import eListboxPythonMultiContent, eListbox, gFont, \
-	RT_HALIGN_LEFT, RT_VALIGN_CENTER
+from enigma import eListboxPythonMultiContent, gFont, RT_HALIGN_LEFT, RT_VALIGN_CENTER
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 from Components.MenuList import MenuList
 from Components.Button import Button
 from Components.config import config
-from Components.ActionMap import ActionMap, NumberActionMap
-from Components.ConfigList import ConfigList, ConfigListScreen
-from Components.config import ConfigSubsection, ConfigSubList, ConfigIP, ConfigInteger, ConfigSelection, ConfigText, ConfigYesNo, getConfigListEntry, configfile
+from Components.ActionMap import ActionMap
+from Components.ConfigList import ConfigListScreen
+from Components.config import ConfigSubsection, ConfigIP, ConfigInteger, ConfigSelection, ConfigText, ConfigYesNo, getConfigListEntry, configfile
 from skin import TemplatedListFonts, componentSizes
 
 def initPartnerboxEntryConfig():
@@ -97,7 +96,6 @@ class PartnerboxSetup(ConfigListScreen, Screen):
 
 	def PartnerboxEntries(self):
 		self.session.open(PartnerboxEntriesListConfigScreen)
-
 
 class PartnerboxEntriesListConfigScreen(Screen):
 	skin = """

@@ -14,6 +14,5 @@ plugin_PYTHON = \
 	connector.py
 
 plugin_DATA = \
-	ExPlayer.png \
 	maintainer.info \
 	Setup_Partnerbox.png

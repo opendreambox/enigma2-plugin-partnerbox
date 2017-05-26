@@ -1059,12 +1059,11 @@ def setPartnerboxService(self, item, partnerboxentry):
 
 class PartnerBouquetList(Screen):
 	skin = """
-		<screen name="RemoteTimerBouquetList" position="center,center" size="400,420" title="Choose bouquet">
+		<screen name="PartnerBouquetList" position="center,center" size="400,420" title="Choose bouquet">
 		<widget name="text" position="10,10" zPosition="1" size="380,390" font="Regular;20" halign="center" valign="center" />
 		<widget name="bouquetlist" position="10,10" zPosition="2" size="380,390" enableWrapAround="1" scrollbarMode="showOnDemand" />
 	</screen>"""
 	def __init__(self, session, E2Timerlist, partnerboxentry, playeronly, insertType):
-		self.skin = "RemoteTimerBouquetList"
 		self.session = session
 		Screen.__init__(self, session)
 		self["bouquetlist"] = E2BouquetList([])	

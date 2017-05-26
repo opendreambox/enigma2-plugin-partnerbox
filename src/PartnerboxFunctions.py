@@ -129,6 +129,7 @@ class E2Timer:
 		self.service_ref = ServiceReference(servicereference)
 		self.repeatedbegindate = 0
 		self.plugins = {}
+		self.log_entries = []
 	
 	def isRunning(self):
 		return self.state == 2
@@ -141,6 +142,7 @@ def FillE2TimerList(xmlstring, sreference = None):
 		serviceref = None
 	else:
 		serviceref = getServiceRef(sreference)
+	
 	for timer in root.findall("e2timer"):
 		go = False
 		state = 0
@@ -155,6 +157,7 @@ def FillE2TimerList(xmlstring, sreference = None):
 		else:
 			if serviceref.upper() == servicereference.upper() and state != TimerEntry.StateEnded and not disabled:
 				go = True
+				
 		if go:
 			timebegin = 0
 			timeend = 0
@@ -180,6 +183,7 @@ def FillE2TimerList(xmlstring, sreference = None):
 			except: afterevent = 0
 			try: eventId = int(timer.findtext("e2eit", -1))
 			except: eventId = -1
+			
 			E2TimerList.append(E2Timer(
 				servicereference = servicereference,
 				servicename = str(timer.findtext("e2servicename", 'n/a').encode("utf-8", 'ignore')),

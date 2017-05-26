@@ -1064,7 +1064,7 @@ class PartnerBouquetList(Screen):
 		<widget name="bouquetlist" position="10,10" zPosition="2" size="380,390" enableWrapAround="1" scrollbarMode="showOnDemand" />
 	</screen>"""
 	def __init__(self, session, E2Timerlist, partnerboxentry, playeronly, insertType):
-		self.skinName = "RemoteTimerBouquetList"
+		self.skin = "RemoteTimerBouquetList"
 		self.session = session
 		Screen.__init__(self, session)
 		self["bouquetlist"] = E2BouquetList([])	
@@ -1078,7 +1078,7 @@ class PartnerBouquetList(Screen):
 			"ok": self.action,
 			"back": self.closeScreen,
 		}, -1)
-
+		
 		self.PartnerboxEntry = partnerboxentry
 		self.password = partnerboxentry.password.value
 		self.username = "root"

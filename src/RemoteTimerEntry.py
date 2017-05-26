@@ -498,20 +498,20 @@ def RemoteTimerGo(self):
 		baseTimerEntryGo(self)
 	else:
 		service_ref = self.timerentry_service_ref
-		descr = urllib.quote(self.timerentry_description.value)
+		descr = self.timerentry_description.value
 		begin, end = self.getBeginEnd()
 		ip = "%d.%d.%d.%d" % tuple(self.entryguilist[int(self.timerentry_remote.value)][2].ip.value)
 		port = self.entryguilist[int(self.timerentry_remote.value)][2].port.value
 		http = "http://%s:%d" % (ip,port)
 
-		name = urllib.quote(self.timerentry_name.value)
+		name = self.timerentry_name.value
 		self.timer.tags = self.timerentry_tags
 		if self.timerentry_justplay.value == "zap":
 			justplay = 1
 			dirname = ""
 		else:
 			justplay = 0
-			dirname = urllib.quote(self.timerentry_dirname.value)
+			dirname = self.timerentry_dirname.value
 		if dirname == "N/A":
 			self.session.open(MessageBox,_("Timer can not be added...no locations on partnerbox available."),MessageBox.TYPE_INFO)
 		else:

@@ -230,7 +230,7 @@ def getRemoteClockPixmap(self, refstr, beginTime, duration, eventId):
 	endTime = beginTime + duration
 	for x in partnerboxfunctions.remote_timer_list:
 		if x.servicereference.upper() == serviceref.upper():
-			if x.eventId == eventId:
+			if x.eit == eventId:
 				return self.remote_clock_pixmap
 			beg = x.timebegin
 			end = x.timeend

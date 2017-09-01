@@ -68,6 +68,7 @@ from ServiceReference import ServiceReference
 
 config.plugins.Partnerbox = ConfigSubsection()
 config.plugins.Partnerbox.showremotetimerinextensionsmenu= ConfigYesNo(default = True)
+config.plugins.Partnerbox.showremotetimerinmainmenu = ConfigYesNo(default = False)
 config.plugins.Partnerbox.enablepartnerboxintimerevent = ConfigYesNo(default = False)
 config.plugins.Partnerbox.enablepartnerboxepglist = ConfigYesNo(default = False)
 config.plugins.Partnerbox.enabledefaultpartnerboxintimeredit = ConfigYesNo(default = False)
@@ -119,6 +120,11 @@ def setup(session,**kwargs):
 
 def main(session,**kwargs):
 	partnerboxpluginStart(session, 2)
+	
+def mainmenu(menuid, **kwargs):
+	if menuid == "mainmenu":
+		return [(_("Partnerbox: RemoteTimer"), main, "remotetimer", 43)]
+	return []
 
 def Plugins(**kwargs):
 	list = [PluginDescriptor(name="Partnerbox: RemoteTimer", description=_("Manage timer for other dreamboxes in network"), 
@@ -127,15 +133,14 @@ def Plugins(**kwargs):
 		list.append(PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = autostart_RemoteTimerInit))
 	if config.plugins.Partnerbox.enablepartnerboxepglist.value:
 		list.append(PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = autostart_Partnerbox_EPGList))
-
-
 	list.append(PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = autostart_ChannelContextMenu))
-
-
 	list.append(PluginDescriptor(name="Setup Partnerbox", description=_("setup for partnerbox"), where = [PluginDescriptor.WHERE_PLUGINMENU], icon = "Setup_Partnerbox.png", fnc=setup))
 	if config.plugins.Partnerbox.showremotetimerinextensionsmenu.value:
 		list.append(PluginDescriptor(name="Partnerbox: RemoteTimer", description=_("Manage timer for other dreamboxes in network"), 
 		where = [PluginDescriptor.WHERE_EXTENSIONSMENU], fnc=main))
+	if config.plugins.Partnerbox.showremotetimerinmainmenu.value:
+		list.append(PluginDescriptor(name="Partnerbox: RemoteTimer", description=_("Manage timer for other dreamboxes in network"),
+		where = [PluginDescriptor.WHERE_MENU], fnc=mainmenu))
 	
 	return list
 			
@@ -326,7 +331,8 @@ class RemoteTimerList(TimerEditList):
 		else:
 			disabled = 0
 		
-		sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eventId, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend  )
+		#sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eventId, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend  )
+		sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eit, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend  )
 		
 		sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		
@@ -355,6 +361,10 @@ class RemoteTimerList(TimerEditList):
 			
 	def timerDeleteCallback(self, result):
 		self.readRemoteTimers()
+
+	def addTimer(self, timer):
+		from RemoteTimerEntry import RemoteTimerEntry
+		self.session.openWithCallback(self.finishedAdd, RemoteTimerEntry, timer, [], self.partnerboxentry, self.E2TimerList)	
 	
 	def finishedAdd(self, answer):
 		if answer[0]:
@@ -379,12 +389,14 @@ class RemoteTimerList(TimerEditList):
 			getLocations(self, "http://" + http_ + "/web/getlocations", self.partnerboxentry, False, "edit")
 		
 	def	openEditCallback(self):
-		self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry)
+		#self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry)
+		self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry, self.E2TimerList)
 	
 	def finishedEdit(self, answer):
 		if answer[0]:
 			t = answer[1]
-			sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eventId, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )
+			#sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eventId, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )
+			sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eit, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )			
 		
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		else:
@@ -581,7 +593,9 @@ class RemoteTimerEPGList(Screen):
 			return
 		description = cur[0].eventdescription
 		dirname = "/media/hdd/movie/"
-		timerentry = E2Timer(servicereference = cur[0].servicereference, servicename = cur[0].servicename, name = cur[0].eventtitle, disabled = 0, timebegin = cur[0].eventstart, timeend = cur[0].eventstart + cur[0].eventduration, duration = cur[0].eventduration, startprepare = 0, state = 0 , repeated = 0, justplay= 0, eventId = 0, afterevent = 0, dirname = dirname, description = description)
+		#timerentry = E2Timer(servicereference = cur[0].servicereference, servicename = cur[0].servicename, name = cur[0].eventtitle, disabled = 0, timebegin = cur[0].eventstart, timeend = cur[0].eventstart + cur[0].eventduration, duration = cur[0].eventduration, startprepare = 0, state = 0 , repeated = 0, justplay= 0, eventId = 0, afterevent = 0, dirname = dirname, description = description)
+		timerentry = E2Timer(servicereference = cur[0].servicereference, servicename = cur[0].servicename, name = cur[0].eventtitle, disabled = 0, timebegin = cur[0].eventstart, timeend = cur[0].eventstart + cur[0].eventduration, duration = cur[0].eventduration, startprepare = 0, state = 0 , repeated = 0, justplay= 0, eit = 0, afterevent = 0, dirname = dirname, description = description)
+		
 		self.session.openWithCallback(self.RemoteTimerEntryFinished, RemoteTimerEntry,timerentry, self.Locations)
 
 	def RemoteTimerEntryFinished(self, answer):
@@ -590,6 +604,7 @@ class RemoteTimerEPGList(Screen):
 			entry = answer[1]
 			self["epglist"].instance.hide()
 			ref = urllib.quote(entry.servicereference.decode('utf8').encode('latin-1','ignore')) + "&begin=" + ("%s"%(entry.timebegin)) + "&end=" + ("%s"%(entry.timeend))  + "&name=" + urllib.quote(entry.name) + "&description=" + urllib.quote(entry.description) + "&dirname=" + urllib.quote(entry.dirname) + "&eit=0&justplay=" + ("%s"%(entry.justplay)) + "&afterevent=" + ("%s"%(entry.afterevent))
+			
 			sCommand = self.http + "/web/timeradd?sRef=" + ref
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.deleteTimerCallback).addErrback(self.EPGListDownloadError)
 	
@@ -597,7 +612,8 @@ class RemoteTimerEPGList(Screen):
 		cur = self["epglist"].getCurrent()
 		if cur is None:
 			return
-		timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
+		#timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
+		timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eit, self.E2TimerList)
 		if timerentry is None:
 			return
 		else:
@@ -609,7 +625,8 @@ class RemoteTimerEPGList(Screen):
 			if cur is None:
 				return
 			self.ListCurrentIndex = self["epglist"].getCurrentIndex()
-			timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
+			#timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
+			timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eit, self.E2TimerList)
 			if timerentry is None:
 				return
 			else:
@@ -848,7 +865,8 @@ class E2EPGList(MenuList):
 		endTime = beginTime + duration
 		for x in self.timer_list:
 			if x.servicereference.upper() == refstr.upper():
-				if x.eventId == eventId:
+				#if x.eventId == eventId:
+				if x.eit == eventId:
 					return self.clock_pixmap
 				beg = x.timebegin
 				end = x.timeend
@@ -1069,7 +1087,7 @@ class PartnerBouquetList(Screen):
 		self["bouquetlist"] = E2BouquetList([])	
 		self["text"] = Label(_("Getting Partnerbox Bouquet Information..."))	
 		self.onLayoutFinish.append(self.startRun)	
-		self.E2TimerList = E2Timerlist					
+		self.E2TimerList = E2Timerlist		
 		self.useinternal = 0 # always use partnerbox services
 		self.insertType = insertType
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions"],
@@ -1178,6 +1196,7 @@ class PartnerChannelList(Screen):
 		self.skinName = "PartnerChannelList"
 		self.session = session
 		Screen.__init__(self, session)
+		
 		self["channellist"] = E2ChannelList([], selChangedCB = self.onSelectionChanged)		
 		self.playeronly = playeronly		
 		self.useinternal = 0 # always use partnerbox services
@@ -1225,7 +1244,7 @@ class PartnerChannelList(Screen):
 	def getEpg(self):
 		if self.playeronly == 0:
 			cur = self["channellist"].l.getCurrentSelection()[0]
-			self.session.openWithCallback(self.getEpgCallback, RemoteTimerEPGList, [], cur.servicereference, cur.servicename, self.partnerboxentry, False)
+			self.session.openWithCallback(self.getEpgCallback, RemoteTimerEPGList, self.E2TimerList, cur.servicereference, cur.servicename, self.partnerboxentry, False)
 
 	def getEpgCallback(self, result):
 		if len(result)>0:

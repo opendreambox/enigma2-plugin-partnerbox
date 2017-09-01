@@ -43,14 +43,14 @@ def url_parse(url, defaultPort=None):
 		port = int(port)
 	return scheme, host, port, path
 
-def getTimerType(refstr, beginTime, duration, eventId, timer_list):
+def getTimerType(refstr, beginTime, duration, eit, timer_list):
 	pre = 1
 	post = 2
 	type = 0
 	endTime = beginTime + duration
 	for x in timer_list:
 		if x.servicereference.upper() == refstr.upper():
-			if x.eventId == eventId:
+			if x.eit == eit:
 				return True
 			beg = x.timebegin
 			end = x.timeend
@@ -67,7 +67,7 @@ def getTimerType(refstr, beginTime, duration, eventId, timer_list):
 	else:
 		return True
 
-def isInTimerList(begin, duration, service, eventid, timer_list):
+def isInTimerList(begin, duration, service, eit, timer_list):
 	time_match = 0
 	chktime = None
 	chktimecmp = None
@@ -100,13 +100,13 @@ def isInTimerList(begin, duration, service, eventid, timer_list):
 					if time_match < diff:
 						time_match = diff
 			if time_match:
-				if getTimerType(serviceref, begin, duration, eventid, timer_list):
+				if getTimerType(serviceref, begin, duration, eit, timer_list):				
 					timerentry = x
 				break
 	return timerentry
 
 class E2Timer:
-	def __init__(self, servicereference = "", servicename = "", name = "", disabled = 0, timebegin = 0, timeend = 0, duration = 0, startprepare = 0, state = 0, repeated = 0, justplay = 0, eventId = 0, afterevent = 0, dirname = "", description = ""):
+	def __init__(self, servicereference = "", servicename = "", name = "", disabled = 0, timebegin = 0, timeend = 0, duration = 0, startprepare = 0, state = 0, repeated = 0, justplay = 0, eit = 0, afterevent = 0, dirname = "", description = ""):	
 		self.servicereference = servicereference
 		self.servicename = servicename
 		self.name = name
@@ -118,7 +118,6 @@ class E2Timer:
 		self.state = state
 		self.repeated = repeated
 		self.justplay = justplay
-		self.eventId = eventId
 		self.afterEvent = afterevent
 		self.dirname = dirname
 		self.description = description
@@ -130,6 +129,7 @@ class E2Timer:
 		self.repeatedbegindate = 0
 		self.plugins = {}
 		self.log_entries = []
+		self.eit = eit
 	
 	def isRunning(self):
 		return self.state == 2
@@ -142,7 +142,7 @@ def FillE2TimerList(xmlstring, sreference = None):
 		serviceref = None
 	else:
 		serviceref = getServiceRef(sreference)
-	
+
 	for timer in root.findall("e2timer"):
 		go = False
 		state = 0
@@ -166,7 +166,7 @@ def FillE2TimerList(xmlstring, sreference = None):
 			repeated = 0
 			justplay = 0
 			afterevent = 0
-			eventId = -1
+			eit = -1
 			try: timebegin = int(timer.findtext("e2timebegin", 0))
 			except: timebegin = 0
 			try: timeend = int(timer.findtext("e2timeend", 0))
@@ -181,8 +181,8 @@ def FillE2TimerList(xmlstring, sreference = None):
 			except: justplay = 0
 			try: afterevent = int(timer.findtext("e2afterevent", 0))
 			except: afterevent = 0
-			try: eventId = int(timer.findtext("e2eit", -1))
-			except: eventId = -1
+			try: eit = int(timer.findtext("e2eit", -1))
+			except: eit = -1
 			
 			E2TimerList.append(E2Timer(
 				servicereference = servicereference,
@@ -196,7 +196,7 @@ def FillE2TimerList(xmlstring, sreference = None):
 				state = state,
 				repeated = repeated,
 				justplay = justplay,
-				eventId = eventId,
+				eit = eit,
 				afterevent = afterevent,
 				dirname = str(timer.findtext("e2location", '').encode("utf-8", 'ignore')),
 				description = str(timer.findtext("e2description", '').encode("utf-8", 'ignore'))))

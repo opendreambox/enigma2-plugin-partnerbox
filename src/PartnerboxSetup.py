@@ -37,7 +37,7 @@ def initPartnerboxEntryConfig():
 	config.plugins.Partnerbox.Entries[i].password = ConfigText(default = "dreambox", visible_width = 50, fixed_size = False)
 	config.plugins.Partnerbox.Entries[i].useinternal = ConfigSelection(default="1", choices = [("0", _("use external")),("1", _("use internal"))])
 	config.plugins.Partnerbox.Entries[i].zaptoservicewhenstreaming = ConfigYesNo(default = True)
-	config.plugins.Partnerbox.Entries[i].webinterfacetype = ConfigSelection(default="standard", choices = [("standard", _("Standard")), ("openwebif", _("OpenWebif"))])
+	config.plugins.Partnerbox.Entries[i].webinterfacetype = ConfigSelection(default="standard", choices = [("standard", _("Standard")), ("openwebif", _("Old Webinterface/OpenWebif"))])
 	return config.plugins.Partnerbox.Entries[i]
 
 def initConfig():
@@ -71,6 +71,7 @@ class PartnerboxSetup(ConfigListScreen, Screen):
 
 		self.list = [ ]
 		self.list.append(getConfigListEntry(_("Show 'RemoteTimer' in E-Menu"), config.plugins.Partnerbox.showremotetimerinextensionsmenu))
+		self.list.append(getConfigListEntry(_("Show 'RemoteTimer' in main menu"), config.plugins.Partnerbox.showremotetimerinmainmenu))
 		self.list.append(getConfigListEntry(_("Enable Partnerbox-Function in TimerEvent"), config.plugins.Partnerbox.enablepartnerboxintimerevent))
 		self.list.append(getConfigListEntry(_("Enable Partnerbox-Function in EPGList"), config.plugins.Partnerbox.enablepartnerboxepglist))
 		self.list.append(getConfigListEntry(_("Enable first Partnerbox-entry in Timeredit as default"), config.plugins.Partnerbox.enabledefaultpartnerboxintimeredit))

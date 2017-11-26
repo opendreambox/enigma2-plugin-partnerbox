@@ -56,9 +56,10 @@ class RemoteTimerEntry(TimerEntry):
 		self.E2TimerList = E2TimerList
 		self.mode = mode
 		
-		self.timeBeginOld = timer.timebegin
-		self.timeEndOld = timer.timeend
-		self.srefOld = timer.servicereference
+		if self.mode == "edit":
+			self.timeBeginOld = timer.timebegin
+			self.timeEndOld = timer.timeend
+			self.srefOld = timer.servicereference
 		self.eit = timer.eit
 		
 		TimerEntry.__init__(self, session, timer)

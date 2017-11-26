@@ -51,9 +51,15 @@ class RemoteTimerEntry(TimerEntry):
 			<widget name="config" position="10,60" size="800,330" enableWrapAround="1" scrollbarMode="showOnDemand" />
 		</screen>"""
 		
-	def __init__(self, session, timer, Locations, partnerboxentry = None, E2TimerList = []):
+	def __init__(self, session, timer, Locations, partnerboxentry = None, E2TimerList = [], mode="add"):
 		self.partnerboxentry = partnerboxentry
 		self.E2TimerList = E2TimerList
+		self.mode = mode
+		
+		self.timeBeginOld = timer.timebegin
+		self.timeEndOld = timer.timeend
+		self.srefOld = timer.servicereference
+		self.eit = timer.eit
 		
 		TimerEntry.__init__(self, session, timer)
 		
@@ -65,7 +71,6 @@ class RemoteTimerEntry(TimerEntry):
 			3: "auto"
 			}[self.timer.afterEvent]
 		
-		self.timerentry_justplay = ConfigSelection(choices = [("1", _("zap")), ("0", _("record"))], default = str(justplay))
 		default = self.timer.dirname
 		self.Locations = Locations
 		if default == "None":
@@ -197,6 +202,9 @@ def getLocationsCallback(self, xmlstring, check = False, mode = "new"):
 		if mode == "new":
 			RemoteTimercreateConfig(self)
 			RemoteTimerCreateSetup(self,"config")
+		elif mode == "read":
+			from plugin import RemoteTimerList
+			RemoteTimerList.addTimerCallback(self)
 		else:
 			from plugin import RemoteTimerList
 			RemoteTimerList.openEditCallback(self)
@@ -263,6 +271,12 @@ def RemoteTimernewConfig(self):
 	else:
 		if int(self.timerentry_remote.value) == 0:
 			baseTimerEntrynewConfig(self)
+		else:
+			if self["config"].getCurrent() == self.timerTypeEntry:
+				#RemoteTimercreateConfig(self)
+				RemoteTimerCreateSetup(self,"config")				
+			elif self["config"].getCurrent() == self.frequencyEntry:
+				RemoteTimerCreateSetup(self,"config")
 	
 def RemoteTimercreateConfig(self):
 	justplay = self.timer.justplay
@@ -279,11 +293,36 @@ def RemoteTimercreateConfig(self):
 	weekday = 0
 	for x in (0, 1, 2, 3, 4, 5, 6):
 		day.append(0)
+	if self.timer.repeated:
+		type = "repeated"
+		if (self.timer.repeated == 31): # Mon-Fri
+			repeated = "weekdays"
+		elif (self.timer.repeated == 127): # daily
+			repeated = "daily"
+		else:
+			flags = self.timer.repeated
+			repeated = "user"
+			count = 0
+			for x in (0, 1, 2, 3, 4, 5, 6):
+				if flags == 1: # weekly
+					print "Set to weekday " + str(x)
+					weekday = x
+				if flags & 1 == 1: # set user defined flags
+					day[x] = 1
+					count += 1
+				else:
+					day[x] = 0
+				flags = flags >> 1
+			if count == 1:
+				repeated = "weekly"
+	else: # once
+		type = "once"
+		repeated = None
+		weekday = (int(strftime("%w", localtime(self.timer.begin))) - 1) % 7
+		day[weekday] = 1
 	begin = self.timer.begin
 	end = self.timer.end
-	weekday = (int(strftime("%w", localtime(begin))) - 1) % 7
-	day[weekday] = 1
-
+	
 	event = None
 	if self.timer.eit:
 		event =  eEPGCache.getInstance().lookupEventId(self.timer.service_ref.ref, self.timer.eit)
@@ -301,10 +340,13 @@ def RemoteTimercreateConfig(self):
 	else:
 		description = ""
 	self.timerentry_justplay = ConfigSelection(choices = [("1", _("zap")), ("0", _("record"))], default = {0: "0", 1: "1"}[justplay])
-	#self.timerentry_justplay = ConfigSelection(choices = [("1", _("zap")), ("0", _("record"))], default = str(justplay))
+
+	self.timerentry_type = ConfigSelection(choices = [("once", _("once")), ("repeated", _("repeated"))], default = type)
+	
 	self.timerentry_afterevent = ConfigSelection(choices = [("nothing", _("do nothing")), ("standby", _("go to standby")), ("deepstandby", _("go to deep standby")), ("auto", _("auto"))], default = afterevent)
 	self.timerentry_name = ConfigText(default = name, visible_width = 50, fixed_size = False)
 	self.timerentry_description = ConfigText(default = description, visible_width = 50, fixed_size = False)
+	self.timerentry_repeated = ConfigSelection(default = repeated, choices = [("daily", _("daily")), ("weekly", _("weekly")), ("weekdays", _("Mon-Fri")), ("user", _("user defined"))])
 	self.timerentry_date = ConfigDateTime(default = begin, formatstring = _("%d.%B %Y"), increment = 86400)
 	self.timerentry_starttime = ConfigClock(default = begin)
 	self.timerentry_endtime = ConfigClock(default = end)
@@ -320,6 +362,12 @@ def RemoteTimercreateConfig(self):
 	
 		
 	self.timerentry_dirname = ConfigSelection(default = default, choices = self.Locations)
+	repeatedbegin = begin
+	if self.timer.repeatedbegindate > 0:
+		repeatedbegin = self.timer.repeatedbegindate
+	
+	self.timerentry_repeatedbegindate = ConfigDateTime(default = repeatedbegin, formatstring = _("%d.%B %Y"), increment = 86400)
+	
 	self.timerentry_weekday = ConfigSelection(default = weekday_table[weekday], choices = [("mon",_("Monday")), ("tue", _("Tuesday")), ("wed",_("Wednesday")), ("thu", _("Thursday")), ("fri", _("Friday")), ("sat", _("Saturday")), ("sun", _("Sunday"))])
 	self.timerentry_day = ConfigSubList()
 	for x in (0, 1, 2, 3, 4, 5, 6):
@@ -344,8 +392,36 @@ def RemoteTimerCreateSetup(self, widget):
 	self.list.append(getConfigListEntry(_("Description"), self.timerentry_description))
 	self.timerJustplayEntry = getConfigListEntry(_("Timer Type"), self.timerentry_justplay)
 	self.list.append(self.timerJustplayEntry)
+	self.timerTypeEntry = getConfigListEntry(_("Repeat Type"), self.timerentry_type)
+	self.list.append(self.timerTypeEntry)
+
+	if self.timerentry_type.value == "once":
+		self.frequencyEntry = None
+	else: # repeated
+		self.frequencyEntry = getConfigListEntry(_("Repeats"), self.timerentry_repeated)
+		self.list.append(self.frequencyEntry)
+		# fixme: starting on is unix start date when entered via webif...
+		self.repeatedbegindateEntry = getConfigListEntry(_("Starting on"), self.timerentry_repeatedbegindate)
+		self.list.append(self.repeatedbegindateEntry)
+		if self.timerentry_repeated.value == "daily":
+			pass
+		if self.timerentry_repeated.value == "weekdays":
+			pass
+		if self.timerentry_repeated.value == "weekly":
+			self.list.append(getConfigListEntry(_("Weekday"), self.timerentry_weekday))
+		
+		if self.timerentry_repeated.value == "user":
+			self.list.append(getConfigListEntry(_("Monday"), self.timerentry_day[0]))
+			self.list.append(getConfigListEntry(_("Tuesday"), self.timerentry_day[1]))
+			self.list.append(getConfigListEntry(_("Wednesday"), self.timerentry_day[2]))
+			self.list.append(getConfigListEntry(_("Thursday"), self.timerentry_day[3]))
+			self.list.append(getConfigListEntry(_("Friday"), self.timerentry_day[4]))
+			self.list.append(getConfigListEntry(_("Saturday"), self.timerentry_day[5]))
+			self.list.append(getConfigListEntry(_("Sunday"), self.timerentry_day[6]))	
+	
 	self.entryDate = getConfigListEntry(_("Date"), self.timerentry_date)
-	self.list.append(self.entryDate)
+	if self.timerentry_type.value == "0": #fixme
+		self.list.append(self.entryDate)
 	self.entryStartTime = getConfigListEntry(_("StartTime"), self.timerentry_starttime)
 	self.list.append(self.entryStartTime)
 	
@@ -411,9 +487,40 @@ def RemoteTimerGo(self):
 			}.get(self.timerentry_afterevent.value, AFTEREVENT.NONE)
 			if service_ref.getPath(): # partnerbox service ?
 				service_ref = getServiceRef(service_ref.ref.toString())
+
+			self.timer.resetRepeated()
+			if self.timerentry_type.value == "repeated":
+				if self.timerentry_repeated.value == "daily":
+					for x in (0, 1, 2, 3, 4, 5, 6):
+						self.timer.setRepeated(x)
 				
-			sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&eit=0&justplay=%d&afterevent=%s" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname),justplay,afterevent)
+				elif self.timerentry_repeated.value == "weekly":
+					self.timer.setRepeated(self.timerentry_weekday.index)
+
+				elif self.timerentry_repeated.value == "weekdays":
+					for x in (0, 1, 2, 3, 4):
+						self.timer.setRepeated(x)
+
+				elif self.timerentry_repeated.value == "user":
+					for x in (0, 1, 2, 3, 4, 5, 6):
+						if self.timerentry_day[x].value:
+							self.timer.setRepeated(x)
+						
+			# this is an ugly hack. When a timer is created out of EPG self.mode does not exist. 
+			try:
+				self.mode
+			except:
+				self.mode = "add"
+	
+			if self.mode == "add":
+				sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&eit=0&justplay=%d&afterevent=%s&repeated=%d" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname),justplay,afterevent, self.timer.repeated)
+			else: # edit
+				#todo: wird eit jemals gesetzt bei web timern?
+				sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=0&justplay=%s&repeated=%d&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (http, service_ref, begin, end, urllib.quote(name), urllib.quote(descr), urllib.quote(dirname), afterevent, self.eit, justplay, self.timer.repeated, self.srefOld, self.timeBeginOld, self.timeEndOld   )
+			print "final command is", sCommand
+			
 			sendPartnerBoxWebCommand(sCommand, 3, "root", str(self.entryguilist[int(self.timerentry_remote.value)][2].password.value), self.entryguilist[int(self.timerentry_remote.value)][2].webinterfacetype.value).addCallback(boundFunction(AddTimerE2Callback,self, self.session)).addErrback(boundFunction(AddTimerError,self,self.session))
+			
 
 def AddTimerE2Callback(self, session, answer):
 	text = ""
@@ -426,11 +533,14 @@ def AddTimerE2Callback(self, session, answer):
 	ok = state == "True"
 	session.open(MessageBox,_("Partnerbox Answer: \n%s") % (text),MessageBox.TYPE_INFO, timeout = 10)
 	if ok:
-		if (config.plugins.Partnerbox.enablepartnerboxepglist.value): 
+		if self.mode == "edit":
+				self.close((False, True))
+		else:
+			if (config.plugins.Partnerbox.enablepartnerboxepglist.value): 
 			# Timerlist der Partnerbox neu laden --> Anzeige fuer EPGList, aber nur, wenn die gleiche IP in EPGList auch angezeigt wird
-			if partnerboxfunctions.CurrentIP == self.entryguilist[int(self.timerentry_remote.value)][2].ip.value:
-				SetPartnerboxTimerlist(self.entryguilist[int(self.timerentry_remote.value)][2])
-		self.keyCancel()
+				if partnerboxfunctions.CurrentIP == self.entryguilist[int(self.timerentry_remote.value)][2].ip.value:
+					SetPartnerboxTimerlist(self.entryguilist[int(self.timerentry_remote.value)][2])
+			self.keyCancel()
 
 def AddTimerError(self, session, error):
 	session.open(MessageBox,str(error.getErrorMessage()),MessageBox.TYPE_INFO)

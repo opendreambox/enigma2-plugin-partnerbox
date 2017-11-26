@@ -363,8 +363,21 @@ class RemoteTimerList(TimerEditList):
 		self.readRemoteTimers()
 
 	def addTimer(self, timer):
+		from RemoteTimerEntry import getLocations
+		
+		self.Locations = []
+		self.timer = timer
+		
+		ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
+		port = self.partnerboxentry.port.value
+		http_ = "%s:%d" % (ip,port)
+		getLocations(self, "http://" + http_ + "/web/getlocations", self.partnerboxentry, False, "read")
+		
+	
+	def addTimerCallback(self):
 		from RemoteTimerEntry import RemoteTimerEntry
-		self.session.openWithCallback(self.finishedAdd, RemoteTimerEntry, timer, [], self.partnerboxentry, self.E2TimerList)	
+		
+		self.session.openWithCallback(self.finishedAdd, RemoteTimerEntry, self.timer, self.Locations, self.partnerboxentry, self.E2TimerList)	
 	
 	def finishedAdd(self, answer):
 		if answer[0]:
@@ -390,9 +403,10 @@ class RemoteTimerList(TimerEditList):
 		
 	def	openEditCallback(self):
 		#self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry)
-		self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry, self.E2TimerList)
+		self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry, self.E2TimerList, mode="edit")
 	
 	def finishedEdit(self, answer):
+		# when editing a timer from Remote Timer List the timer is already updated there. So, answer[0] is False
 		if answer[0]:
 			t = answer[1]
 			#sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eventId, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )
@@ -400,7 +414,12 @@ class RemoteTimerList(TimerEditList):
 		
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		else:
-			print "Timeredit aborted"
+			# this is used when editing a timer from Remote Timer List. As the timer is already changed we only need to reload the list
+			if len(answer)>1:
+				if answer[1] == True:
+					self.readRemoteTimers()
+			else:
+				print "Timeredit aborted"
 	
 	def cleanupTimer(self, delete):
 		if delete:
@@ -561,6 +580,7 @@ class RemoteTimerEPGList(Screen):
 			self.ListCurrentIndex = 0
 		
 	def GreenPressed(self):
+		self.showAddTimer = False
 		if self.showAddTimer:
 			if self.key_green_choice == self.ADD_TIMER:
 				self.getLocations()
@@ -613,7 +633,7 @@ class RemoteTimerEPGList(Screen):
 		if cur is None:
 			return
 		#timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
-		timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eit, self.E2TimerList)
+		timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
 		if timerentry is None:
 			return
 		else:
@@ -626,7 +646,7 @@ class RemoteTimerEPGList(Screen):
 				return
 			self.ListCurrentIndex = self["epglist"].getCurrentIndex()
 			#timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
-			timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eit, self.E2TimerList)
+			timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
 			if timerentry is None:
 				return
 			else:
@@ -1244,9 +1264,9 @@ class PartnerChannelList(Screen):
 	def getEpg(self):
 		if self.playeronly == 0:
 			cur = self["channellist"].l.getCurrentSelection()[0]
-			self.session.openWithCallback(self.getEpgCallback, RemoteTimerEPGList, self.E2TimerList, cur.servicereference, cur.servicename, self.partnerboxentry, False)
+			self.session.openWithCallback(self.getEpgCallback, RemoteTimerEPGList, self.E2TimerList, cur.servicereference, cur.servicename, self.partnerboxentry, True) # changed to true. side effects?
 
-	def getEpgCallback(self, result):
+	def getEpgCallback(self, result=[]):
 		if len(result)>0:
 			if result[0].servicename == "<n/a>":
 				name = self["channellist"].l.getCurrentSelection()[0].servicename

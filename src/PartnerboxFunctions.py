@@ -133,6 +133,13 @@ class E2Timer:
 	
 	def isRunning(self):
 		return self.state == 2
+		
+	def resetRepeated(self):
+		self.repeated = int(0)
+		
+	def setRepeated(self, day):
+		self.repeated |= (2 ** day)
+		print "Repeated: " + str(self.repeated)
 	
 def FillE2TimerList(xmlstring, sreference = None):
 	E2TimerList = []

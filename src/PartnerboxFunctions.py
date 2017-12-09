@@ -106,7 +106,7 @@ def isInTimerList(begin, duration, service, eit, timer_list):
 	return timerentry
 
 class E2Timer:
-	def __init__(self, servicereference = "", servicename = "", name = "", disabled = 0, timebegin = 0, timeend = 0, duration = 0, startprepare = 0, state = 0, repeated = 0, justplay = 0, eit = 0, afterevent = 0, dirname = "", description = ""):	
+	def __init__(self, servicereference = "", servicename = "", name = "", disabled = 0, timebegin = 0, timeend = 0, duration = 0, startprepare = 0, state = 0, repeated = 0, justplay = 0, eit = 0, afterevent = 0, dirname = "", description = "", tags = None):	
 		self.servicereference = servicereference
 		self.servicename = servicename
 		self.name = name
@@ -124,7 +124,7 @@ class E2Timer:
 		###### added to make it work with TimerEdit
 		self.begin = timebegin
 		self.end = timeend
-		self.tags = []
+		self.tags = tags or []
 		self.service_ref = ServiceReference(servicereference)
 		self.repeatedbegindate = 0
 		self.plugins = {}
@@ -164,6 +164,14 @@ def FillE2TimerList(xmlstring, sreference = None):
 		else:
 			if serviceref.upper() == servicereference.upper() and state != TimerEntry.StateEnded and not disabled:
 				go = True
+		
+		tags = []
+		if timer.findtext("e2tags") == "":
+			pass
+		else:
+			tagsList = timer.findtext("e2tags").encode("utf-8", 'ignore').split(" ")
+			for tag in tagsList:
+				tags.append(tag)
 				
 		if go:
 			timebegin = 0
@@ -206,7 +214,8 @@ def FillE2TimerList(xmlstring, sreference = None):
 				eit = eit,
 				afterevent = afterevent,
 				dirname = str(timer.findtext("e2location", '').encode("utf-8", 'ignore')),
-				description = str(timer.findtext("e2description", '').encode("utf-8", 'ignore'))))
+				description = str(timer.findtext("e2description", '').encode("utf-8", 'ignore')),
+				tags = tags))
 	return E2TimerList
 	
 def sendPartnerBoxWebCommand(url, timeout=60, username = "root", password = "", webiftype="standard", *args, **kwargs):

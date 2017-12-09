@@ -330,9 +330,18 @@ class RemoteTimerList(TimerEditList):
 			disabled = 1
 		else:
 			disabled = 0
+			
+		tagset = ""
+		for tag in t.tags:
+			if tag == 'None':
+				break
+			if tagset == "":
+				tagset = tag
+			else:
+				tagset += " " + tag
 		
-		#sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eventId, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend  )
-		sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eit, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend  )
+		sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend  )
+		
 		
 		sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		
@@ -373,7 +382,6 @@ class RemoteTimerList(TimerEditList):
 		http_ = "%s:%d" % (ip,port)
 		getLocations(self, "http://" + http_ + "/web/getlocations", self.partnerboxentry, False, "read")
 		
-	
 	def addTimerCallback(self):
 		from RemoteTimerEntry import RemoteTimerEntry
 		
@@ -402,15 +410,23 @@ class RemoteTimerList(TimerEditList):
 			getLocations(self, "http://" + http_ + "/web/getlocations", self.partnerboxentry, False, "edit")
 		
 	def	openEditCallback(self):
-		#self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry)
 		self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry, self.E2TimerList, mode="edit")
 	
 	def finishedEdit(self, answer):
 		# when editing a timer from Remote Timer List the timer is already updated there. So, answer[0] is False
 		if answer[0]:
 			t = answer[1]
-			#sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eventId, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )
-			sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), t.afterEvent, t.eit, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )			
+
+			tagset = ""
+			for tag in t.tags:
+				if tag == 'None':
+					break
+				if tagset == "":
+					tagset = tag
+				else:
+					tagset += " " + tag			
+			
+			sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )			
 		
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		else:
@@ -613,7 +629,6 @@ class RemoteTimerEPGList(Screen):
 			return
 		description = cur[0].eventdescription
 		dirname = "/media/hdd/movie/"
-		#timerentry = E2Timer(servicereference = cur[0].servicereference, servicename = cur[0].servicename, name = cur[0].eventtitle, disabled = 0, timebegin = cur[0].eventstart, timeend = cur[0].eventstart + cur[0].eventduration, duration = cur[0].eventduration, startprepare = 0, state = 0 , repeated = 0, justplay= 0, eventId = 0, afterevent = 0, dirname = dirname, description = description)
 		timerentry = E2Timer(servicereference = cur[0].servicereference, servicename = cur[0].servicename, name = cur[0].eventtitle, disabled = 0, timebegin = cur[0].eventstart, timeend = cur[0].eventstart + cur[0].eventduration, duration = cur[0].eventduration, startprepare = 0, state = 0 , repeated = 0, justplay= 0, eit = 0, afterevent = 0, dirname = dirname, description = description)
 		
 		self.session.openWithCallback(self.RemoteTimerEntryFinished, RemoteTimerEntry,timerentry, self.Locations)
@@ -632,7 +647,6 @@ class RemoteTimerEPGList(Screen):
 		cur = self["epglist"].getCurrent()
 		if cur is None:
 			return
-		#timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
 		timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
 		if timerentry is None:
 			return
@@ -645,7 +659,6 @@ class RemoteTimerEPGList(Screen):
 			if cur is None:
 				return
 			self.ListCurrentIndex = self["epglist"].getCurrentIndex()
-			#timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
 			timerentry = isInTimerList(cur[0].eventstart,cur[0].eventduration, cur[0].servicereference, cur[0].eventid, self.E2TimerList)
 			if timerentry is None:
 				return

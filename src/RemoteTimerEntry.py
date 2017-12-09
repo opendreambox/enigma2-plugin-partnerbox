@@ -31,6 +31,7 @@ from time import localtime, mktime, strftime
 from datetime import datetime
 from Screens.TimerEntry import TimerEntry
 from Screens.MessageBox import MessageBox
+from Screens.MovieSelection import getPreferredTagEditor
 from Tools.BoundFunction import boundFunction
 import urllib
 
@@ -269,12 +270,17 @@ def RemoteTimernewConfig(self):
 			RemoteTimerCreateSetup(self,"config")
 		else:
 			baseTimerEntrynewConfig(self)
+	elif getPreferredTagEditor() and self["config"].getCurrent() == self.tagsSet:
+		self.session.openWithCallback(
+			self.tagEditFinished,
+			getPreferredTagEditor(),
+			self.timerentry_tags
+		)		
 	else:
 		if int(self.timerentry_remote.value) == 0:
 			baseTimerEntrynewConfig(self)
 		else:
 			if self["config"].getCurrent() == self.timerTypeEntry:
-				#RemoteTimercreateConfig(self)
 				RemoteTimerCreateSetup(self,"config")				
 			elif self["config"].getCurrent() == self.frequencyEntry:
 				RemoteTimerCreateSetup(self,"config")
@@ -323,7 +329,7 @@ def RemoteTimercreateConfig(self):
 		day[weekday] = 1
 	begin = self.timer.begin
 	end = self.timer.end
-	
+
 	event = None
 	if self.timer.eit:
 		event =  eEPGCache.getInstance().lookupEventId(self.timer.service_ref.ref, self.timer.eit)
@@ -347,6 +353,8 @@ def RemoteTimercreateConfig(self):
 	self.timerentry_afterevent = ConfigSelection(choices = [("nothing", _("do nothing")), ("standby", _("go to standby")), ("deepstandby", _("go to deep standby")), ("auto", _("auto"))], default = afterevent)
 	self.timerentry_name = ConfigText(default = name, visible_width = 50, fixed_size = False)
 	self.timerentry_description = ConfigText(default = description, visible_width = 50, fixed_size = False)
+	self.timerentry_tags = self.timer.tags[:]
+	self.timerentry_tagsset = ConfigSelection(choices = [not self.timerentry_tags and "None" or " ".join(self.timerentry_tags)])
 	self.timerentry_repeated = ConfigSelection(default = repeated, choices = [("daily", _("daily")), ("weekly", _("weekly")), ("weekdays", _("Mon-Fri")), ("user", _("user defined"))])
 	self.timerentry_date = ConfigDateTime(default = begin, formatstring = _("%d.%B %Y"), increment = 86400)
 	self.timerentry_starttime = ConfigClock(default = begin)
@@ -401,7 +409,6 @@ def RemoteTimerCreateSetup(self, widget):
 	else: # repeated
 		self.frequencyEntry = getConfigListEntry(_("Repeats"), self.timerentry_repeated)
 		self.list.append(self.frequencyEntry)
-		# fixme: starting on is unix start date when entered via webif...
 		self.repeatedbegindateEntry = getConfigListEntry(_("Starting on"), self.timerentry_repeatedbegindate)
 		self.list.append(self.repeatedbegindateEntry)
 		if self.timerentry_repeated.value == "daily":
@@ -437,9 +444,13 @@ def RemoteTimerCreateSetup(self, widget):
 	self.channelEntry = getConfigListEntry(_("Channel"), self.timerentry_service)
 	self.list.append(self.channelEntry)
 	self.dirname = getConfigListEntry(_("Location"), self.timerentry_dirname)
+	self.tagsSet = getConfigListEntry(_("Tags"), self.timerentry_tagsset)
 
 	if self.timerentry_justplay.value != "zap":
-		self.list.append(self.dirname)
+		if config.usage.setup_level.index >= 2: # expert+
+			self.list.append(self.dirname)
+		if getPreferredTagEditor():
+			self.list.append(self.tagsSet)
 		self.list.append(getConfigListEntry(_("After event"), self.timerentry_afterevent))
 	self[widget].list = self.list
 		
@@ -514,10 +525,9 @@ def RemoteTimerGo(self):
 				self.mode = "add"
 	
 			if self.mode == "add":
-				sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&eit=0&justplay=%d&afterevent=%s&repeated=%d" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname),justplay,afterevent, self.timer.repeated)
+				sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&tags=%s&eit=%s&justplay=%d&afterevent=%s&repeated=%d" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname),urllib.quote(self.timerentry_tagsset.value), self.timer.eit, justplay,afterevent, self.timer.repeated)
 			else: # edit
-				#todo: wird eit jemals gesetzt bei web timern?
-				sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=&afterevent=%s&eit=%s&disabled=0&justplay=%s&repeated=%d&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (http, service_ref, begin, end, urllib.quote(name), urllib.quote(descr), urllib.quote(dirname), afterevent, self.eit, justplay, self.timer.repeated, self.srefOld, self.timeBeginOld, self.timeEndOld   )
+				sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=0&justplay=%s&repeated=%d&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (http, service_ref, begin, end, urllib.quote(name), urllib.quote(descr), urllib.quote(dirname), urllib.quote(self.timerentry_tagsset.value), afterevent, self.eit, justplay, self.timer.repeated, self.srefOld, self.timeBeginOld, self.timeEndOld   )
 			print "final command is", sCommand
 			
 			sendPartnerBoxWebCommand(sCommand, 3, "root", str(self.entryguilist[int(self.timerentry_remote.value)][2].password.value), self.entryguilist[int(self.timerentry_remote.value)][2].webinterfacetype.value).addCallback(boundFunction(AddTimerE2Callback,self, self.session)).addErrback(boundFunction(AddTimerError,self,self.session))

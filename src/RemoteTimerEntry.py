@@ -26,7 +26,7 @@ from Components.ConfigList import ConfigListScreen
 from Components.Label import Label
 from Components.Pixmap import Pixmap
 from RecordTimer import AFTEREVENT
-from enigma import eEPGCache
+from enigma import eEPGCache, getDesktop
 from time import localtime, mktime, strftime
 from datetime import datetime
 from Screens.TimerEntry import TimerEntry
@@ -41,16 +41,35 @@ from PartnerboxFunctions import sendPartnerBoxWebCommand, getServiceRef, SetPart
 import PartnerboxFunctions as partnerboxfunctions
 from time import localtime
 
+sz_w = getDesktop(0).size().width()
+
 class RemoteTimerEntry(TimerEntry):
-	skin = """
-		<screen name="RemoteTimerEntry" position="center,center" size="820,420" title="Remote timer entry">
-			<widget name="cancel" pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" alphatest="on" />
-			<widget name="ok" pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" alphatest="on" />
-			<widget name="canceltext" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="oktext" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<eLabel position="10,50" size="800,1" backgroundColor="grey" />
-			<widget name="config" position="10,60" size="800,330" enableWrapAround="1" scrollbarMode="showOnDemand" />
+	if sz_w == 1920:
+		skin = """
+        <screen name="RemoteTimerEntry" position="center,170" size="1200,820" title="Remote timer entry">
+        <widget name="cancel" pixmap="Default-FHD/skin_default/buttons/red.svg" position="10,5" size="300,70" />
+        <widget name="ok" pixmap="Default-FHD/skin_default/buttons/green.svg" position="310,5" size="300,70" />
+        <widget backgroundColor="#9f1313" font="Regular;30" halign="center" name="canceltext" position="10,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="300,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#1f771f" font="Regular;30" halign="center" name="oktext" position="310,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="300,70" transparent="1" valign="center" zPosition="1" />
+        <widget font="Regular;34" halign="right" position="1050,25" render="Label" size="120,40" source="global.CurrentTime">
+            <convert type="ClockToText">Default</convert>
+        </widget>
+        <widget font="Regular;34" halign="right" position="800,25" render="Label" size="240,40" source="global.CurrentTime">
+            <convert type="ClockToText">Date</convert>
+        </widget>
+        <eLabel backgroundColor="grey" position="10,80" size="1180,1" />
+        <widget enableWrapAround="1" name="config" position="10,90" scrollbarMode="showOnDemand" size="1180,720" />
 		</screen>"""
+	else:
+		skin = """
+			<screen name="RemoteTimerEntry" position="center,center" size="820,420" title="Remote timer entry">
+				<widget name="cancel" pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" />
+				<widget name="ok" pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" />
+				<widget name="canceltext" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="oktext" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<eLabel position="10,50" size="800,1" backgroundColor="grey" />
+				<widget name="config" position="10,60" size="800,330" enableWrapAround="1" scrollbarMode="showOnDemand" />
+			</screen>"""
 		
 	def __init__(self, session, timer, Locations, partnerboxentry = None, E2TimerList = [], mode="add"):
 		self.partnerboxentry = partnerboxentry
@@ -528,7 +547,6 @@ def RemoteTimerGo(self):
 				sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&tags=%s&eit=%s&justplay=%d&afterevent=%s&repeated=%d" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname),urllib.quote(self.timerentry_tagsset.value), self.timer.eit, justplay,afterevent, self.timer.repeated)
 			else: # edit
 				sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=0&justplay=%s&repeated=%d&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (http, service_ref, begin, end, urllib.quote(name), urllib.quote(descr), urllib.quote(dirname), urllib.quote(self.timerentry_tagsset.value), afterevent, self.eit, justplay, self.timer.repeated, self.srefOld, self.timeBeginOld, self.timeEndOld   )
-			print "final command is", sCommand
 			
 			sendPartnerBoxWebCommand(sCommand, 3, "root", str(self.entryguilist[int(self.timerentry_remote.value)][2].password.value), self.entryguilist[int(self.timerentry_remote.value)][2].webinterfacetype.value).addCallback(boundFunction(AddTimerE2Callback,self, self.session)).addErrback(boundFunction(AddTimerError,self,self.session))
 			

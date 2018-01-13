@@ -40,7 +40,7 @@ from Tools.Directories import resolveFilename, SCOPE_CURRENT_SKIN
 from Tools.FuzzyDate import FuzzyTime
 from Tools.BoundFunction import boundFunction
 from timer import TimerEntry
-from enigma import eTimer
+from enigma import eTimer, getDesktop
 from time import localtime
 import time
 import xml.etree.cElementTree
@@ -65,6 +65,8 @@ from skin import TemplatedListFonts, componentSizes
 from timer import TimerEntry as RealTimerEntry
 
 from ServiceReference import ServiceReference
+
+sz_w = getDesktop(0).size().width()
 
 config.plugins.Partnerbox = ConfigSubsection()
 config.plugins.Partnerbox.showremotetimerinextensionsmenu= ConfigYesNo(default = True)
@@ -143,7 +145,7 @@ def Plugins(**kwargs):
 		where = [PluginDescriptor.WHERE_MENU], fnc=mainmenu))
 	
 	return list
-			
+
 def FillLocationList(xmlstring):
 	Locations = []
 	try: root = xml.etree.cElementTree.fromstring(xmlstring)
@@ -155,19 +157,36 @@ def FillLocationList(xmlstring):
 	return Locations
 		
 class RemoteTimerList(TimerEditList):
-	skin = """  <screen name="RemoteTimerList" position="center,120" size="950,520" title="Remote Timer Editor">
-    	<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" alphatest="on" />
-	    <ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" alphatest="on" />
-    	<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" alphatest="on" />
-	    <ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" alphatest="on" />
-	    <widget name="menubutton" pixmap="skin_default/icons/menu.png" position="810,15" size="100,20" alphatest="on" />
-	    <widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-	    <widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-	    <widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-	    <widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-	    <eLabel position="10,50" size="930,1" backgroundColor="grey" />
-    	<widget name="timerlist" position="10,60" size="930,450" enableWrapAround="1" scrollbarMode="showOnDemand" />
-	  </screen> """
+	if sz_w == 1920:
+		skin = """
+        <screen name="RemoteTimerList" position="center,170" size="1200,820" title="Remote Timer Editor">
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/red.svg" position="10,5" scale="stretch" size="270,70" />
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/green.svg" position="280,5" scale="stretch" size="270,70" />
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/yellow.svg" position="550,5" scale="stretch" size="270,70" />
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/blue.svg" position="820,5" scale="stretch" size="270,70" />
+        <widget backgroundColor="#9f1313" font="Regular;30" halign="center" name="key_red" position="10,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="270,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#1f771f" font="Regular;30" halign="center" name="key_green" position="280,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="270,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#a08500" font="Regular;30" halign="center" name="key_yellow" position="550,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="270,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#18188b" font="Regular;30" halign="center" name="key_blue" position="820,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="270,70" transparent="1" valign="center" zPosition="1" />
+        <eLabel backgroundColor="grey" position="10,80" size="1180,1" />
+        <widget enableWrapAround="1" name="timerlist" position="10,90" scrollbarMode="showOnDemand" size="1180,700" />
+        <ePixmap pixmap="Default-FHD/skin_default/icons/info.svg" position="1110,30" size="80,40" />
+        <widget name="menubutton" pixmap="Default-FHD/skin_default/icons/menu.svg" position="1110,30" size="80,40" zPosition="1" />
+		</screen>"""
+	else:
+		skin = """  <screen name="RemoteTimerList" position="center,120" size="950,520" title="Remote Timer Editor">
+    		<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" />
+	    	<ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" />
+	    	<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" />
+		    <ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" />
+	    	<widget name="menubutton" pixmap="skin_default/icons/menu.png" position="810,15" size="100,20"  />
+		    <widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+		    <widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+	    	<widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+		    <widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+		    <eLabel position="10,50" size="930,1" backgroundColor="grey" />
+    		<widget name="timerlist" position="10,60" size="930,450" enableWrapAround="1" scrollbarMode="showOnDemand" />
+		  </screen> """
 	def __init__(self, session, partnerboxentry = None):
 		self.skinName = "RemoteTimerList"
 		self.partnerboxentry = partnerboxentry
@@ -339,9 +358,8 @@ class RemoteTimerList(TimerEditList):
 				tagset = tag
 			else:
 				tagset += " " + tag
-		
-		sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend  )
-		
+				
+		sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&repeated=%d&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend, t.repeated  )
 		
 		sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		
@@ -416,7 +434,7 @@ class RemoteTimerList(TimerEditList):
 		# when editing a timer from Remote Timer List the timer is already updated there. So, answer[0] is False
 		if answer[0]:
 			t = answer[1]
-
+		
 			tagset = ""
 			for tag in t.tags:
 				if tag == 'None':
@@ -426,7 +444,7 @@ class RemoteTimerList(TimerEditList):
 				else:
 					tagset += " " + tag			
 			
-			sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld   )			
+			sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&repeated=%d&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld, t.repeated   )			
 		
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		else:
@@ -450,20 +468,38 @@ class RemoteTimerEPGList(Screen):
 	EMPTY = 0
 	ADD_TIMER = 1
 	REMOVE_TIMER = 2
-	skin = """
-		<screen name="RemoteTimerEPGList" position="center,120" size="950,520" title ="EPG Selection">
-			<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" alphatest="on" />
-			<widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<eLabel position="10,50" size="930,1" backgroundColor="grey" />
-			<widget name="epglist" position="10,60" size="930,450" zPosition="2" enableWrapAround="1" scrollbarMode="showOnDemand" />
-			<widget name="text" position="10,60" size="930,450" zPosition="1" font="Regular;20" halign="center" valign="center" />
+	if sz_w == 1920:
+		skin = """
+        <screen name="RemoteTimerEPGList" position="center,170" size="1200,820" title="EPG Selection">
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/green.svg" position="10,5" size="300,70" />
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/blue.svg" position="310,5" size="300,70" />
+        <widget backgroundColor="#1f771f" font="Regular;30" halign="center" name="key_green" position="10,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="300,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#18188b" font="Regular;30" halign="center" name="key_blue" position="310,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="300,70" transparent="1" valign="center" zPosition="1" />
+        <widget font="Regular;34" halign="right" position="1050,25" render="Label" size="120,40" source="global.CurrentTime">
+            <convert type="ClockToText">Default</convert>
+        </widget>
+        <widget font="Regular;34" halign="right" position="800,25" render="Label" size="240,40" source="global.CurrentTime">
+            <convert type="ClockToText">Date</convert>
+        </widget>
+        <eLabel backgroundColor="grey" position="10,80" size="1180,1" />
+        <widget enableWrapAround="1" name="epglist" position="10,90" scrollbarMode="showOnDemand" size="1180,720" zPosition="2" />
+        <widget font="Regular;35" halign="center" name="text" position="10,90" size="1180,721" valign="center" zPosition="1" />
 		</screen>"""
+	else:	
+		skin = """
+			<screen name="RemoteTimerEPGList" position="center,120" size="950,520" title ="EPG Selection">
+				<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" />
+				<widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<eLabel position="10,50" size="930,1" backgroundColor="grey" />
+				<widget name="epglist" position="10,60" size="930,450" zPosition="2" enableWrapAround="1" scrollbarMode="showOnDemand" />
+				<widget name="text" position="10,60" size="930,450" zPosition="1" font="Regular;20" halign="center" valign="center" />
+			</screen>"""
 	
 	def __init__(self, session, E2Timerlist, ServiceReference, ServiceName, partnerboxentry, showAddTimer = True):
 		self.session = session
@@ -920,22 +956,32 @@ class RemoteTimerEventView(Screen):
 	EMPTY = 0
 	ADD_TIMER = 1
 	REMOVE_TIMER = 2
-	skin = """
-		<screen name="RemoteTimerEventView" position="center,120" size="950,520" title="Eventview">
-			<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" alphatest="on" />
-			<widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<eLabel position="10,50" size="930,1" backgroundColor="grey" />
-			<widget name="epg_description" position="10,60" size="930,400" font="Regular;22" />
-			<widget name="datetime" position="10,480" size="200,25" font="Regular;22" />
-			<widget name="duration" position="220,480" size="200,25" font="Regular;22" />
-			<widget name="channel" position="430,480" size="500,25" font="Regular;22" halign="right" />
+	if sz_w == 1920:
+		skin = """
+        <screen name="RemoteTimerEventView" position="center,170" size="1200,820" title="Eventview">
+        <widget font="Regular;36" name="channel" position="20,10" size="1160,40" />
+        <widget font="Regular;30" name="epg_description" position="20,70" size="1160,680" />
+        <eLabel backgroundColor="grey" position="10,760" size="1180,1" />
+        <widget font="Regular;32" name="datetime" position="40,770" size="600,40" />
+        <widget font="Regular;32" halign="right" name="duration" position="760,770" size="400,40" />
 		</screen>"""
+	else:	
+		skin = """
+			<screen name="RemoteTimerEventView" position="center,120" size="950,520" title="Eventview">
+				<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" />
+				<widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<eLabel position="10,50" size="930,1" backgroundColor="grey" />
+				<widget name="epg_description" position="10,60" size="930,400" font="Regular;22" />
+				<widget name="datetime" position="10,480" size="200,25" font="Regular;22" />
+				<widget name="duration" position="220,480" size="200,25" font="Regular;22" />
+				<widget name="channel" position="430,480" size="500,25" font="Regular;22" halign="right" />
+			</screen>"""
 	
 	def __init__(self, session, E2Timerlist, epgdata , partnerboxentry):
 		self.session = session
@@ -1078,6 +1124,9 @@ def callbackPartnerboxServiceList(self, result):
 		if isBouquet == 0:
 			servicelist = result[1]
 			item = servicelist[0]
+			sref_split = item.servicereference.split(":")
+			sref_split[1] = "256"
+			item.servicereference = ":".join(sref_split)
 			current_root = self.csel.getRoot()
 			mutableList = self.csel.getMutableList(current_root)
 			if not mutableList is None:
@@ -1109,11 +1158,18 @@ def setPartnerboxService(self, item, partnerboxentry):
 	return service	
 
 class PartnerBouquetList(Screen):
-	skin = """
-		<screen name="PartnerBouquetList" position="center,center" size="400,420" title="Choose bouquet">
-		<widget name="text" position="10,10" zPosition="1" size="380,390" font="Regular;20" halign="center" valign="center" />
-		<widget name="bouquetlist" position="10,10" zPosition="2" size="380,390" enableWrapAround="1" scrollbarMode="showOnDemand" />
-	</screen>"""
+	if sz_w == 1920:
+		skin = """
+        <screen name="PartnerBouquetList" position="center,center" size="840,730" title="Choose bouquet">
+        <widget enableWrapAround="1" name="bouquetlist" position="10,5" scrollbarMode="showOnDemand" size="820,720" zPosition="2" />
+        <widget font="Regular;35" halign="center" name="text" position="10,5" size="820,720" valign="center" zPosition="1" />
+		</screen>"""
+	else:
+		skin = """
+			<screen name="PartnerBouquetList" position="center,center" size="400,420" title="Choose bouquet">
+			<widget name="text" position="10,10" zPosition="1" size="380,390" font="Regular;20" halign="center" valign="center" />
+			<widget name="bouquetlist" position="10,10" zPosition="2" size="380,390" enableWrapAround="1" scrollbarMode="showOnDemand" />
+		</screen>"""
 	def __init__(self, session, E2Timerlist, partnerboxentry, playeronly, insertType):
 		self.session = session
 		Screen.__init__(self, session)
@@ -1211,20 +1267,36 @@ class PartnerChannelList(Screen):
 	REMOVE_TIMER = 2
 	REMOTE_TIMER_MODE = 0
 	REMOTE_TV_MODE = 1
-	skin = """
-		<screen name="PartnerChannelList" position="center,120" size="950,520" title="Channel List">
-			<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" alphatest="on" />
-			<ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" alphatest="on" />
-			<widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-			<eLabel position="10,50" size="930,1" backgroundColor="grey" />
-			<widget name="channellist" position="10,70" size="930,420" zPosition="2" enableWrapAround="1" scrollbarMode="showOnDemand" />
-			<widget name="text" position="10,60" size="930,450" zPosition="1" font="Regular;20" halign="center" valign="center" />
+	if sz_w == 1920:
+		skin = """
+        <screen name="PartnerChannelList" position="center,170" size="1200,820" title="Channel List">
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/red.svg" position="10,5" size="295,70" />
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/green.svg" position="305,5" size="295,70" />
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/yellow.svg" position="600,5" size="295,70" />
+        <ePixmap pixmap="Default-FHD/skin_default/buttons/blue.svg" position="895,5" size="295,70" />
+        <widget backgroundColor="#9f1313" font="Regular;30" halign="center" name="key_red" position="10,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="295,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#1f771f" font="Regular;30" halign="center" name="key_green" position="305,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="295,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#a08500" font="Regular;30" halign="center" name="key_yellow" position="600,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="295,70" transparent="1" valign="center" zPosition="1" />
+        <widget backgroundColor="#18188b" font="Regular;30" halign="center" name="key_blue" position="895,5" foregroundColor="white" shadowColor="black" shadowOffset="-2,-2" size="295,70" transparent="1" valign="center" zPosition="1" />
+        <eLabel backgroundColor="grey" position="10,80" size="1180,1" />
+        <widget enableWrapAround="1" name="channellist" position="10,90" scrollbarMode="showOnDemand" size="1180,721" zPosition="2" />
+        <widget font="Regular;35" halign="center" name="text" position="10,90" size="1180,721" valign="center" zPosition="1" />
 		</screen>"""
+	else:	
+		skin = """
+			<screen name="PartnerChannelList" position="center,120" size="950,520" title="Channel List">
+				<ePixmap pixmap="skin_default/buttons/red.png" position="10,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/green.png" position="210,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/yellow.png" position="410,5" size="200,40" />
+				<ePixmap pixmap="skin_default/buttons/blue.png" position="610,5" size="200,40" />
+				<widget name="key_red" position="10,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_green" position="210,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_yellow" position="410,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#a08500" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<widget name="key_blue" position="610,5" size="200,40" zPosition="1" font="Regular;20" halign="center" valign="center" backgroundColor="#18188b" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+				<eLabel position="10,50" size="930,1" backgroundColor="grey" />
+				<widget name="channellist" position="10,70" size="930,420" zPosition="2" enableWrapAround="1" scrollbarMode="showOnDemand" />
+				<widget name="text" position="10,60" size="930,450" zPosition="1" font="Regular;20" halign="center" valign="center" />
+			</screen>"""
 	def __init__(self, session, E2Timerlist, ServiceReference, ServiceName, partnerboxentry, playeronly):
 		self.skinName = "PartnerChannelList"
 		self.session = session

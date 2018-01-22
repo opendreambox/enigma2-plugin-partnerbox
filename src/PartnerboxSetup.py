@@ -4,7 +4,7 @@
 #  $Id$
 #
 #  Coded by Dr.Best (c) 2009
-#  Support: board.dreambox-tools.info
+#  Support: board.dreambox.tools
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -40,6 +40,7 @@ def initPartnerboxEntryConfig():
 	config.plugins.Partnerbox.Entries[i].useinternal = ConfigSelection(default="1", choices = [("0", _("use external")),("1", _("use internal"))])
 	config.plugins.Partnerbox.Entries[i].zaptoservicewhenstreaming = ConfigYesNo(default = True)
 	config.plugins.Partnerbox.Entries[i].webinterfacetype = ConfigSelection(default="standard", choices = [("standard", _("Standard")), ("openwebif", _("Old Webinterface/OpenWebif"))])
+	config.plugins.Partnerbox.Entries[i].canRecord = ConfigYesNo(default = False)
 	return config.plugins.Partnerbox.Entries[i]
 
 def initConfig():
@@ -298,6 +299,7 @@ class PartnerboxEntryConfigScreen(ConfigListScreen, Screen):
 			getConfigListEntry(_("Port"), self.current.port),
 			getConfigListEntry(_("Password"), self.current.password),
 			getConfigListEntry(_("Webinterface Type"), self.current.webinterfacetype),
+			getConfigListEntry(_("Recording is possible"), self.current.canRecord),
 			getConfigListEntry(_("Servicelists/EPG"), self.current.useinternal),
 			getConfigListEntry(_("Zap to service when streaming"), self.current.zaptoservicewhenstreaming)
 		]

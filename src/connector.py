@@ -2,8 +2,8 @@
 #  connector
 #
 #  Coded by dre (c) 2017
-#  Support: board.dreambox-tools.info
-#  e-Mail: dre@dreambox-tools.info
+#  Support: board.dreambox.tools
+#  e-Mail: dre@dreambox.tools
 #
 #  This software is open source but it is NOT free software.
 #  

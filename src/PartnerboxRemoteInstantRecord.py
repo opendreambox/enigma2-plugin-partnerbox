@@ -52,13 +52,19 @@ def RemoteInstantRecord__init__(self):
 	if config.plugins.Partnerbox.entriescount.value != 0:
 		self.remoteRecordingRunning = False
 		# add our own options required for remote instant recording
-		temp_list = list(self.startOptionList)
-		temp_list.insert(-1, (_("add recording on Partnerbox (stop after current event)"),"pb_event"))
-		temp_list.insert(-1, (_("add recording on Partnerbox (indefinitely)"), "pb_indefinitely"))
-		self.startOptionList = tuple(temp_list)
-		temp_list = list(self.stopOptionList)
-		temp_list.insert(-1, (_("stop recording on Partnerbox"), "pb_stop"))
-		self.stopOptionList = tuple(temp_list)
+		try:
+			temp_list = list(self.startOptionList)
+			temp_list.insert(-1, (_("add recording on Partnerbox (stop after current event)"),"pb_event"))
+			temp_list.insert(-1, (_("add recording on Partnerbox (indefinitely)"), "pb_indefinitely"))
+			self.startOptionList = tuple(temp_list)
+		expect:
+			pass
+		try:
+			temp_list = list(self.stopOptionList)
+			temp_list.insert(-1, (_("stop recording on Partnerbox"), "pb_stop"))
+			self.stopOptionList = tuple(temp_list)
+		expect:
+			pass
 
 def RemoteInstantRecord_recordQuestionCallback(self, answer):
 	# record now records the current channel on Partnerbox not the current channel on client...

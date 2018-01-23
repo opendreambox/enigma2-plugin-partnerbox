@@ -57,13 +57,13 @@ def RemoteInstantRecord__init__(self):
 			temp_list.insert(-1, (_("add recording on Partnerbox (stop after current event)"),"pb_event"))
 			temp_list.insert(-1, (_("add recording on Partnerbox (indefinitely)"), "pb_indefinitely"))
 			self.startOptionList = tuple(temp_list)
-		expect:
+		except:
 			pass
 		try:
 			temp_list = list(self.stopOptionList)
 			temp_list.insert(-1, (_("stop recording on Partnerbox"), "pb_stop"))
 			self.stopOptionList = tuple(temp_list)
-		expect:
+		except:
 			pass
 
 def RemoteInstantRecord_recordQuestionCallback(self, answer):

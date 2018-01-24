@@ -6,7 +6,7 @@ plugin_PYTHON = \
 	PartnerboxEPGList.py \
 	PartnerboxEPGSelection.py \
 	PartnerboxFunctions.py \
-	PartnerboxRemoteInstantRecord.py
+	PartnerboxRemoteInstantRecord.py \
 	PartnerboxSetup.py \
 	RemoteTimerEntry.py \
 	RemoteTimerList.py \

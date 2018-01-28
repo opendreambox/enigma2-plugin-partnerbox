@@ -844,6 +844,9 @@ def callbackPartnerboxServiceList(self, result):
 			bouquet = result[1][1]
 			services = []
 			for item in servicelist:
+				sref_split = item.servicereference.split(":")
+				sref_split[1] = "256"
+				item.servicereference = ":".join(sref_split)
 				services.append(self.setPartnerboxService(item, partnerboxentry))
 			self.csel.addBouquet("%s (%s)" % (bouquet.servicename.replace("(TV)",""), partnerboxentry.name.value), services)
 	self.close()
@@ -1092,7 +1095,7 @@ class PartnerChannelList(Screen):
 	def ChannelListDownloadError(self, error = None):
 		if error is not None:
 			self["text"].setText(str(error.getErrorMessage()))
-			self.mode = REMOTE_TIMER_MODE
+			self.mode = self.REMOTE_TIMER_MODE
 			
 	def readXMLServiceList(self, xmlstring):
 		self.E2ChannelList = []

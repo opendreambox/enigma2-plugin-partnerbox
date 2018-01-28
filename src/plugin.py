@@ -845,7 +845,8 @@ def callbackPartnerboxServiceList(self, result):
 			services = []
 			for item in servicelist:
 				sref_split = item.servicereference.split(":")
-				sref_split[1] = "256"
+				if sref_split[1] == "0":
+					sref_split[1] = "256"
 				item.servicereference = ":".join(sref_split)
 				services.append(self.setPartnerboxService(item, partnerboxentry))
 			self.csel.addBouquet("%s (%s)" % (bouquet.servicename.replace("(TV)",""), partnerboxentry.name.value), services)

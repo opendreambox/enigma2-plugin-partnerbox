@@ -69,6 +69,14 @@ from ServiceReference import ServiceReference
 
 from PartnerboxRemoteInstantRecord import RemoteInstantRecordingInit
 
+# AutoTimer installed?
+try:
+	from Plugins.Extensions.AutoTimer.plugin import	autotimer
+	autoTimerAvailable = True
+except ImportError:
+	autoTimerAvailable = False
+
+
 sz_w = getDesktop(0).size().width()
 
 config.plugins.Partnerbox = ConfigSubsection()
@@ -80,6 +88,13 @@ config.plugins.Partnerbox.enabledefaultpartnerboxintimeredit = ConfigYesNo(defau
 config.plugins.Partnerbox.entriescount =  ConfigInteger(0)
 config.plugins.Partnerbox.Entries = ConfigSubList()
 initConfig()
+
+
+def partnerboxAutoTimerEventInfo(session, servicelist, **kwargs):
+	from PartnerboxAutoTimer import PartnerboxAutoTimerEPGSelection
+	ref = session.nav.getCurrentlyPlayingServiceReference()
+	session.open(PartnerboxAutoTimerEPGSelection, ref)
+
 
 def showPartnerboxIconsinEPGList():
 	# for epgsearch	
@@ -120,6 +135,12 @@ def autostart_Partnerbox_EPGList(reason, **kwargs):
 			Partnerbox_EPGSelectionInit()
 		except: pass
 
+def autostart_PartnerboxAutoTimer(reason, **kwargs):
+	if "session" in kwargs:
+		session = kwargs["session"]
+		from PartnerboxAutoTimer import PartnerboxAutoTimer
+		PartnerboxAutoTimer(session)
+
 def PartnerboxSetupFinished(session, result):
 	if result:
 		session.openWithCallback(boundFunction(restartGUI, session), MessageBox,_("You have to restart Enigma2 to activate your new preferences! Restart now?"), MessageBox.TYPE_YESNO)
@@ -155,7 +176,9 @@ def Plugins(**kwargs):
 	if config.plugins.Partnerbox.showremotetimerinmainmenu.value:
 		list.append(PluginDescriptor(name="Partnerbox: RemoteTimer", description=_("Manage timer for other dreamboxes in network"),
 		where = [PluginDescriptor.WHERE_MENU], fnc=mainmenu))
-	
+	if autoTimerAvailable:
+		list.append(PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = autostart_PartnerboxAutoTimer))
+		list.append(PluginDescriptor(name = _("add AutoTimer for Partnerbox..."), where = PluginDescriptor.WHERE_EVENTINFO, fnc = partnerboxAutoTimerEventInfo, needsRestart = False))
 	return list
 
 def FillLocationList(xmlstring):
@@ -1149,3 +1172,4 @@ class PartnerChannelList(Screen):
 			self["key_yellow"].setText(_("EPG Selection"))
 		self["key_blue"].setText(_("Info"))
 		serviceref = cur[0].servicereference
+

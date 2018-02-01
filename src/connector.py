@@ -61,7 +61,7 @@ from twisted.internet import reactor, defer
 from base64 import encodestring
 
 # run a command and return the result
-def runCommand(target, username="", password="", host="", port=80, sessionid = "0"):
+def runCommand(target, username="", password="", host="", port=80, sessionid = "0", **kwargs):
 	command = "http://%s:%d%s" %(host, port, target)
 
 	print "[Connector] - Running command ", command
@@ -74,8 +74,11 @@ def runCommand(target, username="", password="", host="", port=80, sessionid = "
 		'content-type':'application/x-www-form-urlencoded',	
 	}
 	
-	postdata = urllib.urlencode(dict(user=username, password=password, sessionid=sessionid))
-	d = getPage('%s' %(command), method='POST', headers = headers, postdata=postdata)
+	postdata = {"user":username, "password":password, "sessionid":sessionid}
+	if "parameter" in kwargs:
+		postdata.update(kwargs["parameter"])
+		
+	d = getPage('%s' %(command), method='POST', headers = headers, postdata=urllib.urlencode(postdata))
 	
 	def readData(data):
 		return data

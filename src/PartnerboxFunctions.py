@@ -222,7 +222,7 @@ def sendPartnerBoxWebCommand(url, timeout=60, username = "root", password = "", 
 	scheme, host, port, path = url_parse(url)
 	
 	if webiftype == "openwebif":
-		d = myconnector.runCommand(path, username, password, host, port, "0")
+		d = myconnector.runCommand(path, username, password, host, port, "0", **kwargs)
 		
 		def returnResult(result):
 			return result
@@ -243,7 +243,7 @@ def sendPartnerBoxWebCommand(url, timeout=60, username = "root", password = "", 
 			print "[Partnerbox] - got session"
 			sessionId = result
 	
-			e = myconnector.runCommand(path, username,password,host,port, sessionId)
+			e = myconnector.runCommand(path, username,password,host,port, sessionId, **kwargs)
 		
 			def returnResult(result):
 				return result

@@ -76,7 +76,7 @@ class PartnerboxAutoTimer(object):
 	def openPartnerboxAutoTimerOverview(self):
 		count = config.plugins.Partnerbox.entriescount.value
 		if count == 1:
-			self.getPartnerboxAutoTimerList(None, config.plugins.Partnerbox.Entries[0])
+			self.getPartnerboxAutoTimerList(None, None, config.plugins.Partnerbox.Entries[0])
 		else:
 			self.session.openWithCallback(self.getPartnerboxAutoTimerList, PartnerboxEntriesListConfigScreen)
 				

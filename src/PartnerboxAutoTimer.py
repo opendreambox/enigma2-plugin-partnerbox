@@ -26,6 +26,8 @@ from PartnerboxSetup import PartnerboxEntriesListConfigScreen
 from Plugins.Extensions.AutoTimer.AutoTimerEditor import AutoTimerEditor, AutoTimerEPGSelection, addAutotimerFromEvent
 from Plugins.Extensions.AutoTimer.AutoTimerOverview import AutoTimerOverview
 from xml.etree.cElementTree import fromstring as cet_fromstring
+from ServiceReference import ServiceReference
+from enigma import eServiceReference
 
 
 class PartnerboxAutoTimer(object):
@@ -71,7 +73,7 @@ class PartnerboxAutoTimer(object):
 	def autotimerImporterCallback(self, ret):
 		if ret:
 			ret, session = ret
-			session.openWithCallback(self.setPartnerboxAutoTimer, AutoTimerEditor,ret)
+			session.openWithCallback(self.setPartnerboxAutoTimer, AutoTimerEditor,ret, False, partnerbox=True)
 			
 	def openPartnerboxAutoTimerOverview(self):
 		count = config.plugins.Partnerbox.entriescount.value
@@ -121,6 +123,12 @@ class PartnerboxAutoTimerEPGSelection(AutoTimerEPGSelection):
 		if not evt:
 			return
 
+		if sref.getPath():
+			sref.ref.setPath("")
+			ref_split = str(sref).split(":")
+			ref_split[1] = "0"
+			sref = ServiceReference(":".join(ref_split))
+
 		addAutotimerFromEvent(self.session, evt = evt, service = sref, importer_Callback = PartnerboxAutoTimer.instance.autotimerImporterCallback)
 
 class PartnerboxAutoTimerOverview(AutoTimerOverview):
@@ -134,6 +142,25 @@ class PartnerboxAutoTimerOverview(AutoTimerOverview):
 	def setCustomTitle(self):
 		from Plugins.Extensions.AutoTimer.plugin import AUTOTIMER_VERSION
 		self.setTitle(_("AutoTimer overview") + " Partnerbox %s - Version: %s" % (self.partnerbox, AUTOTIMER_VERSION))
+		
+	def add(self):
+		newTimer = self.autotimer.defaultTimer.clone()
+		newTimer.id = self.autotimer.getUniqueId()
+
+		if config.plugins.autotimer.editor.value == "wizard":
+			self.session.openWithCallback(
+				self.addCallback,
+				AutoTimerWizard,
+				newTimer
+			)
+		else:
+			self.session.openWithCallback(
+				self.addCallback,
+				AutoTimerEditor,
+				newTimer,
+				False,
+				partnerbox=True
+			)
 		
 	def showFilterTxt(self):
 		pass
@@ -155,4 +182,20 @@ class PartnerboxAutoTimerOverview(AutoTimerOverview):
 		
 	def save(self, unUsed=True):
 		self.close(True)
+
+	def ok(self):
+		# Edit selected Timer
+		current = self["entries"].getCurrent()
+		if current is not None:
+			self.session.openWithCallback(
+				self.editCallback,
+				AutoTimerEditor,
+				current,
+				False,
+				partnerbox=True
+			)
+
+	def removeCallback(self, ret):
+		AutoTimerOverview.removeCallback(self, ret)
+		self.changed = True
 

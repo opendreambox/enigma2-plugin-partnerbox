@@ -17,11 +17,15 @@
 #  GNU General Public License for more details.
 #
 
+from Tools.BoundFunction import boundFunction
 from Screens.MessageBox import MessageBox
+from Screens.ChoiceBox import ChoiceBox
 from Components.config import config
 from PartnerboxFunctions import sendPartnerBoxWebCommand
 from PartnerboxSetup import PartnerboxEntriesListConfigScreen
 from Plugins.Extensions.AutoTimer.AutoTimerEditor import AutoTimerEditor, AutoTimerEPGSelection, addAutotimerFromEvent
+from Plugins.Extensions.AutoTimer.AutoTimerOverview import AutoTimerOverview
+from xml.etree.cElementTree import fromstring as cet_fromstring
 
 
 class PartnerboxAutoTimer(object):
@@ -34,7 +38,7 @@ class PartnerboxAutoTimer(object):
 	def setPartnerboxAutoTimer(self, ret):
 		if ret:
 			from Plugins.Extensions.AutoTimer.plugin import	autotimer
-			parameter = {'xml': autotimer.writeXmlTimer(ret) }
+			parameter = {'xml': autotimer.writeXmlTimer([ret])}
 			count = config.plugins.Partnerbox.entriescount.value
 			if count == 1:
 				self.partnerboxplugin(None, parameter, config.plugins.Partnerbox.Entries[0])
@@ -44,7 +48,6 @@ class PartnerboxAutoTimer(object):
 	def partnerboxplugin(self, unUsed, parameter, partnerboxentry = None):
 		if partnerboxentry is None:
 			return
-
 		ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 		port = partnerboxentry.port.value
 		username = "root"
@@ -53,9 +56,13 @@ class PartnerboxAutoTimer(object):
 		sCommand = "http://%s:%d/autotimer/add_xmltimer" % (ip,port)
 		sendPartnerBoxWebCommand(sCommand, 10, username, password, webiftype, None, parameter=parameter).addCallback(self.downloadCallback).addErrback(self.downloadError)
 
-
 	def downloadCallback(self, result = None):
-		self.session.open(MessageBox,_("AutoTimer was added successfully"),  MessageBox.TYPE_INFO)
+		if result:
+			root = cet_fromstring(result)
+			statetext = root.findtext("e2statetext")
+			if statetext:
+				text =  statetext.encode("utf-8", 'ignore')
+				self.session.open(MessageBox,text,MessageBox.TYPE_INFO, timeout = 10)
 
 	def downloadError(self, error = None):
 		if error is not None:
@@ -65,6 +72,43 @@ class PartnerboxAutoTimer(object):
 		if ret:
 			ret, session = ret
 			session.openWithCallback(self.setPartnerboxAutoTimer, AutoTimerEditor,ret)
+			
+	def openPartnerboxAutoTimerOverview(self):
+		count = config.plugins.Partnerbox.entriescount.value
+		if count == 1:
+			self.getPartnerboxAutoTimerList(None, config.plugins.Partnerbox.Entries[0])
+		else:
+			self.session.openWithCallback(self.getPartnerboxAutoTimerList, PartnerboxEntriesListConfigScreen)
+				
+	def getPartnerboxAutoTimerList(self, unUsed1, unUsed2, partnerboxentry = None):
+		if partnerboxentry is None:
+			return
+		ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
+		port = partnerboxentry.port.value
+		username = "root"
+		password = partnerboxentry.password.value
+		webiftype = partnerboxentry.webinterfacetype.value		
+		sCommand = "http://%s:%d/autotimer?webif=false" % (ip,port)
+		sendPartnerBoxWebCommand(sCommand, 10, username, password, webiftype).addCallback(self.getPartnerboxAutoTimerListCallback, partnerboxentry).addErrback(self.downloadError)
+		
+
+	def getPartnerboxAutoTimerListCallback(self, result, partnerboxentry):
+		if result is not None:
+			from Plugins.Extensions.AutoTimer.AutoTimer import AutoTimer
+			autotimer = AutoTimer()
+			autotimer.readXml(xml_string=result)
+			self.session.openWithCallback(boundFunction(self.callbackAutoTimerOverview,partnerboxentry, autotimer), PartnerboxAutoTimerOverview,autotimer, partnerboxentry.name.value)
+			
+	def callbackAutoTimerOverview(self, partnerboxentry, autotimer, result):
+		if result is not None:
+			parameter = {'xml': autotimer.writeXmlTimer(autotimer.timers)}
+			ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
+			port = partnerboxentry.port.value
+			username = "root"
+			password = partnerboxentry.password.value
+			webiftype = partnerboxentry.webinterfacetype.value		
+			sCommand = "http://%s:%d/autotimer/upload_xmlconfiguration" % (ip,port)
+			sendPartnerBoxWebCommand(sCommand, 10, username, password, webiftype, None, parameter=parameter).addCallback(self.downloadCallback).addErrback(self.downloadError)
 
 class PartnerboxAutoTimerEPGSelection(AutoTimerEPGSelection):
 	def __init__(self, *args):
@@ -79,5 +123,36 @@ class PartnerboxAutoTimerEPGSelection(AutoTimerEPGSelection):
 
 		addAutotimerFromEvent(self.session, evt = evt, service = sref, importer_Callback = PartnerboxAutoTimer.instance.autotimerImporterCallback)
 
+class PartnerboxAutoTimerOverview(AutoTimerOverview):
+	def __init__(self, session, autotimer, partnerbox):
+		AutoTimerOverview.__init__(self, session, autotimer)
+		self.partnerbox = partnerbox
+		self["MenuActions"].setEnabled(False)
+		self["EPGSelectActions"].setEnabled(False)
+		self["InfobarActions"].setEnabled(False)
+		
+	def setCustomTitle(self):
+		from Plugins.Extensions.AutoTimer.plugin import AUTOTIMER_VERSION
+		self.setTitle(_("AutoTimer overview") + " Partnerbox %s - Version: %s" % (self.partnerbox, AUTOTIMER_VERSION))
+		
+	def showFilterTxt(self):
+		pass
 
+	def showSearchLog(self):
+		pass
+		
+	def firstExec(self):
+		pass
+		
+	def cancel(self):
+		if self.changed:
+			self.session.openWithCallback(self.cancelConfirm, ChoiceBox, title=_('Really close without saving settings?\nWhat do you want to do?') , list=[(_('close without saving'), 'close'), (_('close and save'), 'close_save'),(_('cancel'), 'exit'), ])
+		else:
+			self.close(None)
+	
+	def menu(self):
+		pass
+		
+	def save(self, unUsed=True):
+		self.close(True)
 

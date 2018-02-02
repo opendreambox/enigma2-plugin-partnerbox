@@ -94,6 +94,10 @@ def partnerboxAutoTimerEventInfo(session, servicelist, **kwargs):
 	from PartnerboxAutoTimer import PartnerboxAutoTimerEPGSelection
 	ref = session.nav.getCurrentlyPlayingServiceReference()
 	session.open(PartnerboxAutoTimerEPGSelection, ref)
+	
+def openPartnerboxAutoTimerOverview(session,**kwargs):
+	from PartnerboxAutoTimer import PartnerboxAutoTimer
+	PartnerboxAutoTimer.instance.openPartnerboxAutoTimerOverview()
 
 
 def showPartnerboxIconsinEPGList():
@@ -178,6 +182,7 @@ def Plugins(**kwargs):
 		where = [PluginDescriptor.WHERE_MENU], fnc=mainmenu))
 	if autoTimerAvailable:
 		list.append(PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = autostart_PartnerboxAutoTimer))
+		list.append(PluginDescriptor(name="Partnerbox: AutoTimer", description=_("Manage autotimer for other dreamboxes in network"), where = [PluginDescriptor.WHERE_EVENTINFO], fnc=openPartnerboxAutoTimerOverview))
 		list.append(PluginDescriptor(name = _("add AutoTimer for Partnerbox..."), where = PluginDescriptor.WHERE_EVENTINFO, fnc = partnerboxAutoTimerEventInfo, needsRestart = False))
 	return list
 

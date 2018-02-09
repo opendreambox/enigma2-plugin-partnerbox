@@ -49,8 +49,8 @@ def RemoteInstantRecordingInit():
 def RemoteInstantRecord__init__(self):
 	# init InfoBarInstantRecord
 	baseInstantRecording__init__(self)
+	self.remoteRecordingRunning = False
 	if config.plugins.Partnerbox.entriescount.value != 0:
-		self.remoteRecordingRunning = False
 		# add our own options required for remote instant recording
 		try:
 			temp_list = list(self.startOptionList)

@@ -24,6 +24,7 @@ import urlparse
 import connector as myconnector
 from Tools.BoundFunction import boundFunction
 from ServiceReference import ServiceReference
+from enigma import eServiceReference
 
 CurrentIP = None
 remote_timer_list = None
@@ -293,8 +294,7 @@ def setTimerListErrorCallbackError(error):
 	print error.getErrorMessage()
 
 def getServiceRef(sreference):
-	serviceref = sreference
-	hindex = sreference.find("http")
-	if hindex > 0: # partnerbox service ?
-		serviceref =  serviceref[:hindex]
-	return serviceref
+	service = eServiceReference(sreference)
+	service.setPath("")
+	service.setName("")
+	return service.toString()

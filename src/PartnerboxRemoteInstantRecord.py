@@ -102,8 +102,9 @@ def addInfiniteRemoteRecording(self, session, what, partnerboxentry):
 			end = begin + 3600
 			#todo: read insta rec dir
 			name = urllib.quote(_("Instant Record"))
-			dir = urllib.quote("/media/hdd/movie")
+			dir = urllib.quote("/media/hdd/movie/")
 			url = "http://%s:%d/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&dirname=%s&eit=0&description=" %(self.ip, self.port, self.sref, begin, end, name, dir)
+			
 			sendPartnerBoxWebCommand(url).addCallback(boundFunction(RemoteInstantRecordCallback, self)).addErrback(boundFunction(RemoteInstantRecordError, self))	
 	else:
 		self.session.open(MessageBox, _("Partnerbox Serverbox does not support recording"), MessageBox.TYPE_ERROR, timeout=5)	
@@ -137,8 +138,8 @@ def getEPGNowCallback(self, result):
 			end = begin + 3600
 			name = urllib.quote(_("Instant Record"))
 			#todo: read insta rec dir		
-			dir = urllib.quote("/media/hdd/movie")
-			url = "http://%s:%d/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&dirname=/media/hdd/movie&eit=0" %(self.ip, self.port, self.sref, begin, end, name, dir)
+			dir = urllib.quote("/media/hdd/movie/")
+			url = "http://%s:%d/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&dirname=%s&eit=0" %(self.ip, self.port, self.sref, begin, end, name, dir)
 	
 		sendPartnerBoxWebCommand(url).addCallback(boundFunction(RemoteInstantRecordCallback, self)).addErrback(boundFunction(RemoteInstantRecordError, self))
 

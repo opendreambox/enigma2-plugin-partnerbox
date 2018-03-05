@@ -25,6 +25,7 @@ from PartnerboxFunctions import sendPartnerBoxWebCommand
 from PartnerboxSetup import PartnerboxEntriesListConfigScreen
 from Plugins.Extensions.AutoTimer.AutoTimerEditor import AutoTimerEditor, AutoTimerEPGSelection, addAutotimerFromEvent
 from Plugins.Extensions.AutoTimer.AutoTimerOverview import AutoTimerOverview
+from Plugins.Extensions.AutoTimer.AutoTimerWizard import AutoTimerWizard
 from xml.etree.cElementTree import fromstring as cet_fromstring
 from ServiceReference import ServiceReference
 from enigma import eServiceReference

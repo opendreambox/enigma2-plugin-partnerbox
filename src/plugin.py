@@ -887,11 +887,18 @@ def callbackPartnerboxServiceList(self, result):
 def setPartnerboxService(self, item, partnerboxentry):
 	password = partnerboxentry.password.value
 	ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-	port = 8001
-	if password:
-		http = "http://root:%s@%s:%d/%s" % (password,ip,port, item.servicereference)
+	if partnerboxentry.transcoding.value == "rtsp":
+		http = "rtsp://%s:554/stream?ref=%s" % (ip, item.servicereference)
+	elif partnerboxentry.transcoding.value == "hls":
+		http = "http://%s:8080/stream.m3u8?ref=%s" % (ip, item.servicereference)
+	elif partnerboxentry.transcoding.value == "custom":
+		http = partnerboxentry.customStreamUrl.value + item.servicereference
 	else:
-		http = "http://%s:%d/%s" % (ip,port, item.servicereference)
+		port = 8001
+		if password:
+			http = "http://root:%s@%s:%d/%s" % (password,ip,port, item.servicereference)
+		else:
+			http = "http://%s:%d/%s" % (ip,port, item.servicereference)
 	service = eServiceReference(item.servicereference)
 	service.setPath(http)
 	servicename = item.servicename

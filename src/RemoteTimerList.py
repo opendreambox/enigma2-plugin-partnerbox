@@ -28,7 +28,7 @@ from PartnerboxFunctions import FillE2TimerList, sendPartnerBoxWebCommand
 from PartnerboxSetup import PartnerboxEntriesListConfigScreen
 from RemoteTimerEntry import RemoteTimerEntry
 from ServiceReference import ServiceReference
-from Tools.Directories import resolveFilename
+from Tools.Directories import resolveFilename, SCOPE_CURRENT_SKIN
 from Tools.FuzzyDate import FuzzyTime
 from Tools.LoadPixmap import LoadPixmap
 from enigma import eServiceReference, getDesktop

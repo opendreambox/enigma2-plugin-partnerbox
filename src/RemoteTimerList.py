@@ -83,7 +83,8 @@ class RemoteTimerList(TimerEditList):
 			self["menubutton"].hide()
 		
 		TimerEditList.__init__(self, session)
-		self["timerlist"] = TimerList(list)
+		self._timerlist = TimerList(self.list)
+		self["timerlist"] = self._timerlist
 		self["timerlist"].l.setBuildFunc(self.buildRemoteTimerEntry)
 		self.onLayoutFinish.append(self.readRemoteTimers)
 		
@@ -196,7 +197,6 @@ class RemoteTimerList(TimerEditList):
 		
 	def downloadCallback(self, callback = None):
 		self.readXML(callback)
-		self["timerlist"].instance.show()
 
 	def downloadError(self, error = None):
 		if error is not None:
@@ -213,16 +213,17 @@ class RemoteTimerList(TimerEditList):
 				return cmp(x[0].state, y[0].state)
 			return cmp(x[0].begin, y[0].begin)
 		
-		list = self.list
-		del list[:]
-		list.extend([(x,True) for x in self.E2TimerList if x.state == 3])
-		list.extend([(x,False) for x in self.E2TimerList if x.state < 3])
-		if config.usage.timerlist_finished_timer_position.index: #end of list
-			list.sort(cmp = eol_compare)
-		else:
-			list.sort(key = lambda x: x[0].begin)		
+		timers = [(timer, False) for timer in self.E2TimerList if timer.state < 3]
+		timers.extend([(timer, True) for timer in self.E2TimerList if timer.state == 3])
 		
-		self["timerlist"].l.setList(list)
+		if config.usage.timerlist_finished_timer_position.index: #end of list
+			timers.sort(cmp = eol_compare)
+		else:
+			timers.sort(key = lambda x: x[0].begin)		
+		
+		self.list = timers
+		self._timerlist.list = self.list
+		self["timerlist"].instance.show()		
 		self.updateState()
 		
 	def toggleDisabledState(self):

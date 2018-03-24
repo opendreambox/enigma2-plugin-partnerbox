@@ -34,6 +34,7 @@ from Tools.LoadPixmap import LoadPixmap
 from enigma import eServiceReference, getDesktop
 from timer import TimerEntry as RealTimerEntry
 from timer import TimerEntry
+import urllib
 
 sz_w = getDesktop(0).size().width()
 

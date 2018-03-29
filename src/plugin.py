@@ -85,6 +85,7 @@ config.plugins.Partnerbox.showremotetimerinmainmenu = ConfigYesNo(default = Fals
 config.plugins.Partnerbox.enablepartnerboxintimerevent = ConfigYesNo(default = False)
 config.plugins.Partnerbox.enablepartnerboxepglist = ConfigYesNo(default = False)
 config.plugins.Partnerbox.enabledefaultpartnerboxintimeredit = ConfigYesNo(default = False)
+config.plugins.Partnerbox.appendboxname = ConfigYesNo(default = True)
 config.plugins.Partnerbox.entriescount =  ConfigInteger(0)
 config.plugins.Partnerbox.Entries = ConfigSubList()
 initConfig()
@@ -877,20 +878,33 @@ def callbackPartnerboxServiceList(self, result):
 					sref_split[1] = "256"
 				item.servicereference = ":".join(sref_split)
 				services.append(self.setPartnerboxService(item, partnerboxentry))
-			self.csel.addBouquet("%s (%s)" % (bouquet.servicename.replace("(TV)",""), partnerboxentry.name.value), services)
+			bouquetname = bouquet.servicename.replace("(TV)","")
+			if config.plugins.Partnerbox.appendboxname.value:
+				bouquetname += " (%s)" % partnerboxentry.name.value
+			self.csel.addBouquet(bouquetname, services)
 	self.close()
 
 def setPartnerboxService(self, item, partnerboxentry):
 	password = partnerboxentry.password.value
 	ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-	port = 8001
-	if password:
-		http = "http://root:%s@%s:%d/%s" % (password,ip,port, item.servicereference)
+	if partnerboxentry.transcoding.value == "rtsp":
+		http = "rtsp://%s:554/stream?ref=%s" % (ip, item.servicereference)
+	elif partnerboxentry.transcoding.value == "hls":
+		http = "http://%s:8080/stream.m3u8?ref=%s" % (ip, item.servicereference)
+	elif partnerboxentry.transcoding.value == "custom":
+		http = partnerboxentry.customStreamUrl.value + item.servicereference
 	else:
-		http = "http://%s:%d/%s" % (ip,port, item.servicereference)
+		port = 8001
+		if password:
+			http = "http://root:%s@%s:%d/%s" % (password,ip,port, item.servicereference)
+		else:
+			http = "http://%s:%d/%s" % (ip,port, item.servicereference)
 	service = eServiceReference(item.servicereference)
 	service.setPath(http)
-	service.setName("%s (%s)" % (item.servicename, partnerboxentry.name.value))
+	servicename = item.servicename
+	if config.plugins.Partnerbox.appendboxname.value:
+		servicename += " (%s)" % partnerboxentry.name.value
+	service.setName(servicename)
 	return service	
 
 class PartnerBouquetList(Screen):

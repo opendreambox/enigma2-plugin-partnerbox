@@ -41,6 +41,8 @@ def initPartnerboxEntryConfig():
 	config.plugins.Partnerbox.Entries[i].zaptoservicewhenstreaming = ConfigYesNo(default = True)
 	config.plugins.Partnerbox.Entries[i].webinterfacetype = ConfigSelection(default="standard", choices = [("standard", _("Standard")), ("openwebif", _("Old Webinterface/OpenWebif"))])
 	config.plugins.Partnerbox.Entries[i].canRecord = ConfigYesNo(default = False)
+	config.plugins.Partnerbox.Entries[i].transcoding = ConfigSelection(default="no", choices = [("no", _("No")), ("rtsp", "RTSP"), ("hls", "HLS"), ("custom", _("Custom"))])
+	config.plugins.Partnerbox.Entries[i].customStreamUrl = ConfigText(default = "", visible_width = 15, fixed_size = False)
 	return config.plugins.Partnerbox.Entries[i]
 
 def initConfig():
@@ -91,6 +93,7 @@ class PartnerboxSetup(ConfigListScreen, Screen):
 		self.list.append(getConfigListEntry(_("Enable Partnerbox-Function in TimerEvent"), config.plugins.Partnerbox.enablepartnerboxintimerevent))
 		self.list.append(getConfigListEntry(_("Enable Partnerbox-Function in EPGList"), config.plugins.Partnerbox.enablepartnerboxepglist))
 		self.list.append(getConfigListEntry(_("Enable first Partnerbox-entry in Timeredit as default"), config.plugins.Partnerbox.enabledefaultpartnerboxintimeredit))
+		self.list.append(getConfigListEntry(_("Append Partnerbox-name to service/bouquet"), config.plugins.Partnerbox.appendboxname))
 		ConfigListScreen.__init__(self, self.list, session)
 		self["setupActions"] = ActionMap(["SetupActions", "ColorActions"],
 		{
@@ -293,6 +296,12 @@ class PartnerboxEntryConfigScreen(ConfigListScreen, Screen):
 			self.newmode = 0
 			self.current = entry
 
+		self.list = []
+		self.buildConfig()
+
+		ConfigListScreen.__init__(self, self.list, session, on_change = self.changed)
+
+	def buildConfig(self):
 		cfglist = [
 			getConfigListEntry(_("Name"), self.current.name),
 			getConfigListEntry(_("IP"), self.current.ip),
@@ -301,10 +310,19 @@ class PartnerboxEntryConfigScreen(ConfigListScreen, Screen):
 			getConfigListEntry(_("Webinterface Type"), self.current.webinterfacetype),
 			getConfigListEntry(_("Recording is possible"), self.current.canRecord),
 			getConfigListEntry(_("Servicelists/EPG"), self.current.useinternal),
-			getConfigListEntry(_("Zap to service when streaming"), self.current.zaptoservicewhenstreaming)
+			getConfigListEntry(_("Zap to service when streaming"), self.current.zaptoservicewhenstreaming),
+			getConfigListEntry(_("Use Transcoding"), self.current.transcoding)
 		]
 
-		ConfigListScreen.__init__(self, cfglist, session)
+		if self.current.transcoding.value == "custom":
+			cfglist.append(getConfigListEntry(_("Custom Stream URL"), self.current.customStreamUrl))
+
+		self.list = cfglist
+
+	def changed(self):
+		if self["config"].getCurrent()[1] == self.current.transcoding:
+			self.buildConfig()
+			self["config"].setList(self.list)
 
 	def keySave(self):
 		if self.newmode == 1:

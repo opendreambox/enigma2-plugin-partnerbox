@@ -29,18 +29,15 @@ import PartnerboxFunctions as partnerboxfunctions
 from enigma import eServiceReference, eServiceCenter
 
 baseEPGSelection__init__ = None
-baseEPGSelection_zapTo = None
 baseonSelectionChanged = None
 basetimerAdd = None
 basefinishedAdd = None
 baseonCreate = None
 
 def Partnerbox_EPGSelectionInit():
-	global baseEPGSelection__init__, baseEPGSelection_zapTo, baseonSelectionChanged, basetimerAdd, basefinishedAdd, baseonCreate
+	global baseEPGSelection__init__, baseonSelectionChanged, basetimerAdd, basefinishedAdd, baseonCreate
 	if baseEPGSelection__init__ is None:
 		baseEPGSelection__init__ = EPGSelection.__init__
-	if baseEPGSelection_zapTo is None:
-		baseEPGSelection_zapTo = EPGSelection.zapTo
 	if baseonSelectionChanged is None:
 		baseonSelectionChanged = EPGSelection.onSelectionChanged
 	if basetimerAdd is None:
@@ -51,12 +48,13 @@ def Partnerbox_EPGSelectionInit():
 		baseonCreate = EPGSelection.onCreate
 
 	EPGSelection.__init__ = Partnerbox_EPGSelection__init__
-	EPGSelection.zapTo = Partnerbox_EPGSelection_zapTo
 	EPGSelection.onSelectionChanged = Partnerbox_onSelectionChanged
 	EPGSelection.timerAdd = Partnerbox_timerAdd
 	EPGSelection.finishedAdd = Partnerbox_finishedAdd
 	EPGSelection.onCreate = Partnerbox_onCreate
 	# new methods
+	EPGSelection.PartnerboxSelection = PartnerboxSelection
+	EPGSelection.RedButtonText = RedButtonText
 	EPGSelection.NewPartnerBoxSelected = NewPartnerBoxSelected
 	EPGSelection.GetPartnerboxTimerlistCallback = GetPartnerboxTimerlistCallback
 	EPGSelection.GetPartnerboxTimerlistCallbackError = GetPartnerboxTimerlistCallbackError
@@ -73,6 +71,8 @@ def Partnerbox_EPGSelection__init__(self, session, service, zapFunc=None, eventi
 			service = eServiceCenter.getInstance().list(eServiceReference("%s" %(service.toString()))).getContent("S")[0]
 	baseEPGSelection__init__(self, session, service, zapFunc, eventid, bouquetChangeCB, serviceChangeCB)
 	self.PartnerboxInit(True)
+	self._pluginListRed.insert(0,("Partnerbox" if self.partnerboxentry is None else self.partnerboxentry.name.value, self.PartnerboxSelection))
+	self.RedButtonText()
 
 def PartnerboxInit(self, filterRef):
 	self.filterRef = filterRef
@@ -83,14 +83,6 @@ def PartnerboxInit(self, filterRef):
 			self.partnerboxentry = config.plugins.Partnerbox.Entries[0]
 			partnerboxfunctions.CurrentIP = self.partnerboxentry.ip.value
 		except: self.partnerboxentry = None
-	try:self["key_red"].setText(config.plugins.Partnerbox.Entries[0].name.value)
-	except: pass
-	
-def Partnerbox_EPGSelection_zapTo(self): # just used in multiepg
-	if not (self.zapFunc and self.key_red_choice == self.ZAP):
-		self.session.openWithCallback(self.NewPartnerBoxSelected, PartnerboxEntriesListConfigScreen, 0)
-	else:
-		baseEPGSelection_zapTo(self)
 
 def NewPartnerBoxSelected(self, session, what, partnerboxentry = None):
 	if partnerboxentry is not None:
@@ -100,7 +92,9 @@ def NewPartnerBoxSelected(self, session, what, partnerboxentry = None):
 			curService = self.currentService.ref.toString()
 		SetPartnerboxTimerlist(partnerboxentry, curService)
 		Partnerbox_onSelectionChanged(self)
-		self["key_red"].setText(partnerboxentry.name.value)
+		del self._pluginListRed[0]
+		self._pluginListRed.insert(0,(self.partnerboxentry.name.value, self.PartnerboxSelection))
+		self.RedButtonText()
 		self["list"].l.invalidate() # immer zeichnen, da neue Box ausgewaehlt wurde
 
 def Partnerbox_onSelectionChanged(self):
@@ -182,3 +176,13 @@ def DeleteTimerCallbackError(self, error = None):
 	if error is not None:
 		msg = self.session.open(MessageBox, error.getErrorMessage(), MessageBox.TYPE_ERROR)
 		msg.setTitle(_("Partnerbox"))
+
+def PartnerboxSelection(self, session, event, currentService):
+	session.openWithCallback(self.NewPartnerBoxSelected, PartnerboxEntriesListConfigScreen, 0)
+
+def RedButtonText(self):
+	if len(self._pluginListRed) > 1:
+		self["key_red"].setText(_("More ..."))
+	else:
+		self["key_red"].setText("Partnerbox" if self.partnerboxentry is None else self.partnerboxentry.name.value)
+

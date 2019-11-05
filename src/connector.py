@@ -75,8 +75,10 @@ def runCommand(target, username="", password="", host="", port=80, sessionid = "
 	}
 	
 	postdata = {"user":username, "password":password, "sessionid":sessionid}
-	if "parameter" in kwargs:
-		postdata.update(kwargs["parameter"])
+	if "sRef" in kwargs:
+		postdata.update({"sRef":kwargs["sRef"]})
+	if "bRef" in kwargs:
+		postdata.update({"bRef":kwargs["bRef"]})
 		
 	d = getPage('%s' %(command), method='POST', headers = headers, postdata=urllib.urlencode(postdata))
 	

@@ -785,7 +785,7 @@ class RemoteTimerEventView(Screen):
 ###########################################
 # ChannelContextMenu
 ###########################################
-from Screens.ChannelSelection import ChannelContextMenu, OFF, MODE_TV
+from Screens.ChannelSelection import ChannelContextMenu, OFF, MODE_TV, MODE_RADIO
 from Components.ChoiceList import ChoiceEntryComponent
 from Tools.BoundFunction import boundFunction
 
@@ -827,28 +827,47 @@ def partnerboxChannelContextMenu__init__(self, session, csel):
 					else:
 						callFunction = self.addPartnerboxService
 					self["menu"].list.insert(1, ChoiceEntryComponent(text = (_("add Partnerbox bouquet"), boundFunction(callFunction,1))))
+	elif csel.mode == MODE_RADIO:
+		current_root = csel.getRoot()
+		inBouquetRootList = current_root and current_root.getPath().find('FROM BOUQUET "bouquets.') != -1 #FIXME HACK
+		inBouquet = csel.getMutableList() is not None
+		if csel.bouquet_mark_edit == OFF and not csel.movemode:
+			if not inBouquetRootList:
+				if inBouquet:
+					if config.ParentalControl.configured.value:
+						callFunction = self.setParentalControlPin
+					else:
+						callFunction = self.addPartnerboxService
+					self["menu"].list.insert(1, ChoiceEntryComponent(text = (_("add Partnerbox service"), boundFunction(callFunction,0,False))))
+			if (not inBouquetRootList and not inBouquet) or (inBouquetRootList):
+				if config.usage.multibouquet.value:
+					if config.ParentalControl.configured.value:
+						callFunction = self.setParentalControlPin
+					else:
+						callFunction = self.addPartnerboxService
+					self["menu"].list.insert(1, ChoiceEntryComponent(text = (_("add Partnerbox bouquet"), boundFunction(callFunction,1,False))))
 
-def addPartnerboxService(self, insertType):
+def addPartnerboxService(self, insertType, modeTV=True):
 	count = config.plugins.Partnerbox.entriescount.value
 	if count == 1:
-		self.startAddParnerboxService(insertType, None, None, config.plugins.Partnerbox.Entries[0])
+		self.startAddParnerboxService(insertType, modeTV, None, None, config.plugins.Partnerbox.Entries[0])
 	else:
-		self.session.openWithCallback(boundFunction(self.startAddParnerboxService,insertType), PartnerboxEntriesListConfigScreen, 0)
+		self.session.openWithCallback(boundFunction(self.startAddParnerboxService,insertType, modeTV), PartnerboxEntriesListConfigScreen, 0)
 
-def startAddParnerboxService(self, insertType, session, what, partnerboxentry = None):
+def startAddParnerboxService(self, insertType, modeTV, session, what, partnerboxentry = None):
 	if partnerboxentry is None:
 		self.close()
 	else:
-		self.session.openWithCallback(self.callbackPartnerboxServiceList, PartnerBouquetList, [], partnerboxentry, 1, insertType)
+		self.session.openWithCallback(self.callbackPartnerboxServiceList, PartnerBouquetList, [], partnerboxentry, 1, insertType, modeTV)
 
-def setParentalControlPin(self, insertType):
-		self.session.openWithCallback(boundFunction(self.parentalControlPinEntered, insertType), PinInput, pinList = [config.ParentalControl.servicepin[0].value], triesEntry = config.ParentalControl.retries.servicepin, title = _("Enter the service pin"), windowTitle = _("Change pin code"))
+def setParentalControlPin(self, insertType, modeTV):
+	self.session.openWithCallback(boundFunction(self.parentalControlPinEntered, insertType, modeTV), PinInput, pinList = [config.ParentalControl.servicepin[0].value], triesEntry = config.ParentalControl.retries.servicepin, title = _("Enter the service pin"), windowTitle = _("Change pin code"))
 
-def parentalControlPinEntered(self, insertType, result):
-		if result:
-			self.addPartnerboxService(insertType)
-		else:
-			self.session.openWithCallback(self.close, MessageBox, _("The pin code you entered is wrong."), MessageBox.TYPE_ERROR)
+def parentalControlPinEntered(self, insertType, modeTV, result):
+	if result:
+		self.addPartnerboxService(insertType, modeTV)
+	else:
+		self.session.openWithCallback(self.close, MessageBox, _("The pin code you entered is wrong."), MessageBox.TYPE_ERROR)
 
 def callbackPartnerboxServiceList(self, result): 
 	if result and result[1]:
@@ -920,7 +939,7 @@ class PartnerBouquetList(Screen):
 			<widget name="text" position="10,10" zPosition="1" size="380,390" font="Regular;20" halign="center" valign="center" />
 			<widget name="bouquetlist" position="10,10" zPosition="2" size="380,390" enableWrapAround="1" scrollbarMode="showOnDemand" />
 		</screen>"""
-	def __init__(self, session, E2Timerlist, partnerboxentry, playeronly, insertType):
+	def __init__(self, session, E2Timerlist, partnerboxentry, playeronly, insertType, modeTV=True):
 		self.session = session
 		Screen.__init__(self, session)
 		self["bouquetlist"] = E2BouquetList([])	
@@ -946,8 +965,12 @@ class PartnerBouquetList(Screen):
 		port = partnerboxentry.port.value
 		self.http = "http://%s:%d" % (ip,port)
 		self.playeronly = playeronly
-		self.url = self.http + "/web/getservices"	
-
+		if modeTV:
+			self.sRef = '1:7:1:0:0:0:0:0:0:0:(type == 1) || (type == 17) || (type == 22) || (type == 25) || (type == 31) || (type == 134) || (type == 195) FROM BOUQUET "bouquets.tv" ORDER BY bouquet'
+		else:
+			self.sRef = '1:7:2:0:0:0:0:0:0:0:(type == 2) || (type == 10) FROM BOUQUET "bouquets.radio" ORDER BY bouquet'
+		self.url = self.http + "/web/getservices"
+		
 	def action(self):
 		if self.insertType == 0:
 			try:
@@ -996,7 +1019,7 @@ class PartnerBouquetList(Screen):
 		self.getBouquetList()
 	
 	def getBouquetList(self):
-		sendPartnerBoxWebCommand(self.url, 10, self.username, self.password, self.webiftype).addCallback(self.downloadCallback).addErrback(self.ChannelListDownloadError)
+		sendPartnerBoxWebCommand(self.url, 10, self.username, self.password, self.webiftype, sRef=self.sRef).addCallback(self.downloadCallback).addErrback(self.ChannelListDownloadError)
 		
 	def downloadCallback(self, callback = None):
 		self.readXML(callback)
@@ -1133,11 +1156,13 @@ class PartnerChannelList(Screen):
 		if self.ChannelListCurrentIndex !=0:
 			sel = self["channellist"].moveSelectionTo(self.ChannelListCurrentIndex)
 			self.ChannelListCurrentIndex = 0
+		self["text"].hide()
 		self["channellist"].instance.show()
 
 	def ChannelListDownloadError(self, error = None):
 		if error is not None:
 			self["text"].setText(str(error.getErrorMessage()))
+			self["text"].show()
 			self.mode = self.REMOTE_TIMER_MODE
 			
 	def readXMLServiceList(self, xmlstring):

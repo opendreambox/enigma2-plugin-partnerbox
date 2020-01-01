@@ -34,11 +34,12 @@ from Components.MultiContent import MultiContentEntryText
 from Components.Pixmap import Pixmap
 from enigma import eServiceReference
 from enigma import eListboxPythonMultiContent, eListbox, gFont, \
-	RT_HALIGN_LEFT, RT_HALIGN_RIGHT, RT_VALIGN_CENTER
+	RT_HALIGN_LEFT, RT_HALIGN_RIGHT, RT_VALIGN_CENTER, getPrevAsciiCode
 from Tools.LoadPixmap import LoadPixmap
 from Tools.Directories import resolveFilename, SCOPE_CURRENT_SKIN
 from Tools.FuzzyDate import FuzzyTime
 from Tools.BoundFunction import boundFunction
+from Tools.NumericalTextInput import NumericalTextInput
 from timer import TimerEntry
 from enigma import eTimer, getDesktop
 from time import localtime
@@ -500,6 +501,7 @@ class E2ChannelList(MenuList):
 		tlf = TemplatedListFonts()
 		self.l.setFont(0, gFont(tlf.face(tlf.MEDIUM), tlf.size(tlf.MEDIUM)))
 		self.l.setFont(1, gFont(tlf.face(tlf.SMALL), tlf.size(tlf.SMALL)))
+		
 	def postWidgetCreate(self, instance):
 		MenuList.postWidgetCreate(self, instance)
 		sizes = componentSizes[E2ChannelList.SKIN_COMPONENT_KEY]
@@ -541,7 +543,13 @@ class E2ChannelList(MenuList):
 			self.list.append(res)
 		self.l.setList(self.list)
 		self.moveToIndex(0)
-
+		
+	def getFirstMatchingEntry(self, char):
+		for i in range(len(self.list)):
+			if self.list[i][1][7].upper().startswith(char):
+				return i
+		return None
+		
 class E2EPGList(MenuList):
 	SKIN_COMPONENT_KEY = "PartnerboxList"
 	SKIN_COMPONENT_LISTSMALL_HEIGHT = "listsmallHeight"
@@ -967,8 +975,10 @@ class PartnerBouquetList(Screen):
 		self.playeronly = playeronly
 		if modeTV:
 			self.sRef = '1:7:1:0:0:0:0:0:0:0:(type == 1) || (type == 17) || (type == 22) || (type == 25) || (type == 31) || (type == 134) || (type == 195) FROM BOUQUET "bouquets.tv" ORDER BY bouquet'
+			self.sRefAll = '1:7:1:0:0:0:0:0:0:0:(type == 1) || (type == 17) || (type == 22) || (type == 25) || (type == 31) || (type == 134) || (type == 195) ORDER BY name'
 		else:
 			self.sRef = '1:7:2:0:0:0:0:0:0:0:(type == 2) || (type == 10) FROM BOUQUET "bouquets.radio" ORDER BY bouquet'
+			self.sRefAll = '1:7:1:0:0:0:0:0:0:0:(type == 2) || (type == 10) ORDER BY name'
 		self.url = self.http + "/web/getservices"
 		
 	def action(self):
@@ -1024,6 +1034,7 @@ class PartnerBouquetList(Screen):
 	def downloadCallback(self, callback = None):
 		self.readXML(callback)
 		self["bouquetlist"].instance.show()
+		self["text"].hide()
 
 	def readXML(self, xmlstring):
 		BouquetList = []
@@ -1032,6 +1043,7 @@ class PartnerBouquetList(Screen):
 			BouquetList.append(E2ServiceList(
 			servicereference = str(servives.findtext("e2servicereference", '').encode("utf-8", 'ignore')),
 			servicename = str(servives.findtext("e2servicename", 'n/a').encode("utf-8", 'ignore'))))
+		BouquetList.append(E2ServiceList(servicereference = self.sRefAll, servicename = _("All")))
 		self["bouquetlist"].buildList(BouquetList)		
 
 class PartnerChannelList(Screen):
@@ -1079,7 +1091,12 @@ class PartnerChannelList(Screen):
 		self.playeronly = playeronly		
 		self.useinternal = 0 # always use partnerbox services
 		self.partnerboxentry = partnerboxentry
-		self["actions"] = ActionMap(["WizardActions", "DirectionActions", "ColorActions"],
+
+		
+		self.numericalTextInput = NumericalTextInput()
+		self.numericalTextInput.setUseableChars(u'1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+		self["actions"] = NumberActionMap(["WizardActions", "DirectionActions", "ColorActions","NumberActions", "InputAsciiActions"],
 		{
 			"ok": self.getEntry,
 			"back": self.closeScreen,
@@ -1087,6 +1104,17 @@ class PartnerChannelList(Screen):
 			"blue": self.EPGEvent,
 			"red": self.closeScreen,
 			"green": self.getEntry,
+			"gotAsciiCode": self.keyAsciiCode,
+			"1": self.keyNumberGlobal,
+			"2": self.keyNumberGlobal,
+			"3": self.keyNumberGlobal,
+			"4": self.keyNumberGlobal,
+			"5": self.keyNumberGlobal,
+			"6": self.keyNumberGlobal,
+			"7": self.keyNumberGlobal,
+			"8": self.keyNumberGlobal,
+			"9": self.keyNumberGlobal,
+			"0": self.keyNumberGlobal,
 		}, -1)
 		self["key_green"] = Label()
 		self["key_green"].setText(_("Apply"))
@@ -1111,6 +1139,22 @@ class PartnerChannelList(Screen):
 		self.http = "http://%s:%d" % (self.ip,self.port)
 		self.ChannelListCurrentIndex = 0
 		self.mode = self.REMOTE_TIMER_MODE
+
+	def keyNumberGlobal(self, number):
+		unichar = self.numericalTextInput.getKey(number)
+		charstr = unichar.encode("utf-8")
+		if len(charstr) == 1:
+			index = self["channellist"].getFirstMatchingEntry(charstr[0])
+			if index is not None:
+				self["channellist"].moveSelectionTo(index)
+
+	def keyAsciiCode(self):
+		unichar = unichr(getPrevAsciiCode())
+		charstr = unichar.encode("utf-8")
+		if len(charstr) == 1:
+			index = self["channellist"].getFirstMatchingEntry(charstr[0])
+			if index is not None:
+				self["channellist"].moveSelectionTo(index)
 
 	def startRun(self):
 		self["channellist"].instance.hide()

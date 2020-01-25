@@ -868,7 +868,7 @@ def startAddParnerboxService(self, insertType, modeTV, session, what, partnerbox
 	else:
 		self.session.openWithCallback(self.callbackPartnerboxServiceList, PartnerBouquetList, [], partnerboxentry, 1, insertType, modeTV)
 
-def setParentalControlPin(self, insertType, modeTV):
+def setParentalControlPin(self, insertType, modeTV=True):
 	self.session.openWithCallback(boundFunction(self.parentalControlPinEntered, insertType, modeTV), PinInput, pinList = [config.ParentalControl.servicepin[0].value], triesEntry = config.ParentalControl.retries.servicepin, title = _("Enter the service pin"), windowTitle = _("Change pin code"))
 
 def parentalControlPinEntered(self, insertType, modeTV, result):

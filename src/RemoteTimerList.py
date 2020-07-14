@@ -75,7 +75,7 @@ class RemoteTimerList(TimerEditList):
 		self["RemoteTimerActions"] = ActionMap(["MenuActions"],
 		{
 			"menu": self.changePartnerbox,
-		}, -1)
+		}, -2)
 		
 		self["menubutton"] = Pixmap()
 		self.count = config.plugins.Partnerbox.entriescount.value

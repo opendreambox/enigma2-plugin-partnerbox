@@ -447,7 +447,7 @@ def RemoteTimerCreateSetup(self, widget):
 			self.list.append(getConfigListEntry(_("Sunday"), self.timerentry_day[6]))	
 	
 	self.entryDate = getConfigListEntry(_("Date"), self.timerentry_date)
-	if self.timerentry_type.value == "0": #fixme
+	if self.timerentry_type.value == "once":
 		self.list.append(self.entryDate)
 	self.entryStartTime = getConfigListEntry(_("StartTime"), self.timerentry_starttime)
 	self.list.append(self.entryStartTime)

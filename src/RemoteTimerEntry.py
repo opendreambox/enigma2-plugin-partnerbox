@@ -239,7 +239,7 @@ def createRemoteTimerSetup(self, widget):
 	
 def RemoteTimerkeyLeft(self):
 	if int(self.timerentry_remote.value) != 0:
-		if self["config"].getCurrent() == self.channelEntry:
+		if self["config"].getCurrent() in (self.channelEntry, self.tagsSet):
 			try:
 				timerlist = self.E2TimerList
 			except:
@@ -254,7 +254,7 @@ def RemoteTimerkeyLeft(self):
 
 def RemoteTimerkeyRight(self):
 	if int(self.timerentry_remote.value) != 0:
-		if self["config"].getCurrent() == self.channelEntry:
+		if self["config"].getCurrent() in (self.channelEntry, self.tagsSet):
 			try:
 				timerlist = self.E2TimerList
 			except:
@@ -284,7 +284,7 @@ def RemoteTimernewConfig(self):
 		else:
 			baseTimercreateConfig(self)
 			createRemoteTimerSetup(self, "config")
-	elif self["config"].getCurrent() == self.timerJustplayEntry:
+	elif self["config"].getCurrent() in (self.timerTypeEntry, self.timerJustplayEntry, self.frequencyEntry, self.entryShowEndTime):
 		if int(self.timerentry_remote.value) != 0:
 			RemoteTimerCreateSetup(self,"config")
 		else:
@@ -294,16 +294,8 @@ def RemoteTimernewConfig(self):
 			self.tagEditFinished,
 			getPreferredTagEditor(),
 			self.timerentry_tags
-		)		
-	else:
-		if int(self.timerentry_remote.value) == 0:
-			baseTimerEntrynewConfig(self)
-		else:
-			if self["config"].getCurrent() == self.timerTypeEntry:
-				RemoteTimerCreateSetup(self,"config")				
-			elif self["config"].getCurrent() == self.frequencyEntry:
-				RemoteTimerCreateSetup(self,"config")
-	
+		)					
+					
 def RemoteTimercreateConfig(self):
 	justplay = self.timer.justplay
 	
@@ -380,14 +372,14 @@ def RemoteTimercreateConfig(self):
 	self.timerentry_endtime = ConfigClock(default = end)
 	self.timerentry_showendtime = ConfigSelection(default = ((self.timer.end - self.timer.begin) > 4), choices = [(True, _("yes")), (False, _("no"))])	
 
-	if self.Locations:
-		default = self.Locations[0]
-	else:
-		default = "N/A"
-	if default not in self.Locations:
+	default = self.timer.dirname
+	if not default:
+		if self.Locations:
+			default = self.Locations[0]
+		else:
+			default = "N/A"
+	if default and default not in self.Locations:
 		self.Locations.append(default)
-
-	
 		
 	self.timerentry_dirname = ConfigSelection(default = default, choices = self.Locations)
 	repeatedbegin = begin
@@ -400,7 +392,6 @@ def RemoteTimercreateConfig(self):
 	self.timerentry_day = ConfigSubList()
 	for x in (0, 1, 2, 3, 4, 5, 6):
 		self.timerentry_day.append(ConfigYesNo(default = day[x]))
-	# FIXME some service-chooser needed here
 	servicename = "N/A"
 	try: # no current service available?
 		servicename = str(self.timer.service_ref.getServiceName())
@@ -452,11 +443,12 @@ def RemoteTimerCreateSetup(self, widget):
 	self.entryStartTime = getConfigListEntry(_("StartTime"), self.timerentry_starttime)
 	self.list.append(self.entryStartTime)
 	
-	self.entryShowEndTime = getConfigListEntry(_("Set End Time"), self.timerentry_showendtime)	
-	if self.timerentry_justplay.value == "zap":
+	self.entryShowEndTime = getConfigListEntry(_("Set End Time"), self.timerentry_showendtime)
+
+	if self.timerentry_justplay.value == "1": #zap
 		self.list.append(self.entryShowEndTime)
 	self.entryEndTime = getConfigListEntry(_("EndTime"), self.timerentry_endtime)
-	if self.timerentry_justplay.value != "zap" or self.timerentry_showendtime.value:
+	if self.timerentry_justplay.value != "1" or self.timerentry_showendtime.value:
 		self.list.append(self.entryEndTime)
 	else:
 		self.entryEndTime = None
@@ -465,12 +457,12 @@ def RemoteTimerCreateSetup(self, widget):
 	self.dirname = getConfigListEntry(_("Location"), self.timerentry_dirname)
 	self.tagsSet = getConfigListEntry(_("Tags"), self.timerentry_tagsset)
 
-	if self.timerentry_justplay.value != "zap":
+	if self.timerentry_justplay.value != "1": # zap
 		if config.usage.setup_level.index >= 2: # expert+
 			self.list.append(self.dirname)
 		if getPreferredTagEditor():
 			self.list.append(self.tagsSet)
-		self.list.append(getConfigListEntry(_("After event"), self.timerentry_afterevent))
+	self.list.append(getConfigListEntry(_("After event"), self.timerentry_afterevent))
 	self[widget].list = self.list
 		
 	self[widget].l.setList(self.list)

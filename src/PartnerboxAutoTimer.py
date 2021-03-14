@@ -41,7 +41,7 @@ class PartnerboxAutoTimer(object):
 	def setPartnerboxAutoTimer(self, ret):
 		if ret:
 			from Plugins.Extensions.AutoTimer.plugin import	autotimer
-			parameter = {'xml': autotimer.writeXmlTimer([ret])}
+			parameter = autotimer.writeXmlTimer([ret])
 			count = config.plugins.Partnerbox.entriescount.value
 			if count == 1:
 				self.partnerboxplugin(None, parameter, config.plugins.Partnerbox.Entries[0])
@@ -57,7 +57,7 @@ class PartnerboxAutoTimer(object):
 		password = partnerboxentry.password.value
 		webiftype = partnerboxentry.webinterfacetype.value		
 		sCommand = "http://%s:%d/autotimer/add_xmltimer" % (ip,port)
-		sendPartnerBoxWebCommand(sCommand, 10, username, password, webiftype, None, parameter=parameter).addCallback(self.downloadCallback).addErrback(self.downloadError)
+		sendPartnerBoxWebCommand(sCommand, 10, username, password, webiftype, None, xml=parameter).addCallback(self.downloadCallback).addErrback(self.downloadError)
 
 	def downloadCallback(self, result = None):
 		if result:
@@ -104,14 +104,14 @@ class PartnerboxAutoTimer(object):
 			
 	def callbackAutoTimerOverview(self, partnerboxentry, autotimer, result):
 		if result is not None:
-			parameter = {'xml': autotimer.writeXmlTimer(autotimer.timers)}
+			parameter = autotimer.writeXmlTimer(autotimer.timers)
 			ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
 			port = partnerboxentry.port.value
 			username = "root"
 			password = partnerboxentry.password.value
 			webiftype = partnerboxentry.webinterfacetype.value		
 			sCommand = "http://%s:%d/autotimer/upload_xmlconfiguration" % (ip,port)
-			sendPartnerBoxWebCommand(sCommand, 10, username, password, webiftype, None, parameter=parameter).addCallback(self.downloadCallback).addErrback(self.downloadError)
+			sendPartnerBoxWebCommand(sCommand, 10, username, password, webiftype, None, xml=parameter).addCallback(self.downloadCallback).addErrback(self.downloadError)
 
 class PartnerboxAutoTimerEPGSelection(AutoTimerEPGSelection):
 	def __init__(self, *args):

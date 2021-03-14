@@ -101,6 +101,19 @@ def openPartnerboxAutoTimerOverview(session,**kwargs):
 	from PartnerboxAutoTimer import PartnerboxAutoTimer
 	PartnerboxAutoTimer.instance.openPartnerboxAutoTimerOverview()
 
+def partnerboxAutoTimerMovielist(session, service, **kwargs):
+	from Plugins.Extensions.AutoTimer.AutoTimerEditor import addAutotimerFromService
+	from PartnerboxAutoTimer import PartnerboxAutoTimer
+	addAutotimerFromService(session, service, importer_Callback = PartnerboxAutoTimer.instance.autotimerImporterCallback)
+	
+def partnerboxAutoTimerEventView(session, event, ref):
+	from Plugins.Extensions.AutoTimer.AutoTimerEditor import addAutotimerFromEvent, addAutotimerFromService
+	from PartnerboxAutoTimer import PartnerboxAutoTimer
+	if ref.getPath() and ref.getPath()[0] == "/":
+		from enigma import eServiceReference
+		addAutotimerFromService(session, eServiceReference(str(ref)), importer_Callback = PartnerboxAutoTimer.instance.autotimerImporterCallback)
+	else:
+		addAutotimerFromEvent(session, evt = event, service = ref, importer_Callback = PartnerboxAutoTimer.instance.autotimerImporterCallback)
 
 def showPartnerboxIconsinEPGList():
 	# for epgsearch	
@@ -186,6 +199,9 @@ def Plugins(**kwargs):
 		list.append(PluginDescriptor(where = PluginDescriptor.WHERE_SESSIONSTART, fnc = autostart_PartnerboxAutoTimer))
 		list.append(PluginDescriptor(name="Partnerbox: AutoTimer", description=_("Manage autotimer for other dreamboxes in network"), where = [PluginDescriptor.WHERE_EVENTINFO], fnc=openPartnerboxAutoTimerOverview))
 		list.append(PluginDescriptor(name = _("add AutoTimer for Partnerbox..."), where = PluginDescriptor.WHERE_EVENTINFO, fnc = partnerboxAutoTimerEventInfo, needsRestart = False))
+		if hasattr(PluginDescriptor, "WHERE_CHANNEL_SELECTION_RED"):
+			list.append(PluginDescriptor(name = _("add AutoTimer for Partnerbox..."), where = [PluginDescriptor.WHERE_EVENTVIEW, PluginDescriptor.WHERE_EPG_SELECTION_SINGLE_BLUE, PluginDescriptor.WHERE_CHANNEL_SELECTION_RED], fnc = partnerboxAutoTimerEventView, needsRestart = False))
+		list.append(PluginDescriptor(name = _("add AutoTimer for Partnerbox..."), description=_("add AutoTimer for Partnerbox..."), where = PluginDescriptor.WHERE_MOVIELIST, fnc = partnerboxAutoTimerMovielist, needsRestart = False))
 	return list
 
 def FillLocationList(xmlstring):

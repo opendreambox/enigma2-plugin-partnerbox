@@ -943,7 +943,9 @@ def setPartnerboxService(self, item, partnerboxentry):
 		else:
 			http = "http://%s:%d/%s" % (ip,port, item.servicereference)
 	service = eServiceReference(item.servicereference)
-	service.setPath(http)
+	# only set a patch if service does not already have one
+	if not service.getPath():
+		service.setPath(http)
 	servicename = item.servicename
 	if config.plugins.Partnerbox.appendboxname.value:
 		servicename += " (%s)" % partnerboxentry.name.value

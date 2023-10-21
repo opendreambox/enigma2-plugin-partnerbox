@@ -943,8 +943,10 @@ def setPartnerboxService(self, item, partnerboxentry):
 		else:
 			http = "http://%s:%d/%s" % (ip,port, item.servicereference)
 	service = eServiceReference(item.servicereference)
-	# only set a patch if service does not already have one
-	if not service.getPath():
+	# only set a patch if service does not already have one and also not for markers
+	if not service.getPath() and not service.flags == 64:
+		# ensure to set reconnect flag
+		service.flags = 256
 		service.setPath(http)
 	servicename = item.servicename
 	if config.plugins.Partnerbox.appendboxname.value:

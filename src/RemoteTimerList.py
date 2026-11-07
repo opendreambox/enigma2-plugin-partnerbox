@@ -24,7 +24,7 @@ from Components.Pixmap import Pixmap
 from Components.TimerList import TimerList
 from Screens.MessageBox import MessageBox
 from Screens.TimerEdit import TimerEditList
-from PartnerboxFunctions import FillE2TimerList, sendPartnerBoxWebCommand
+from PartnerboxFunctions import FillE2TimerList, sendPartnerBoxWebCommand, getBaseUrl
 from PartnerboxSetup import PartnerboxEntriesListConfigScreen
 from RemoteTimerEntry import RemoteTimerEntry
 from ServiceReference import ServiceReference
@@ -177,8 +177,7 @@ class RemoteTimerList(TimerEditList):
 		return res		
 	
 	def readRemoteTimers(self):
-		self.ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
-		self.port = self.partnerboxentry.port.value
+		self.http = getBaseUrl(self.partnerboxentry)
 		self.username = "root"
 		self.password = self.partnerboxentry.password.value
 		self.webiftype = self.partnerboxentry.webinterfacetype.value		
@@ -191,7 +190,7 @@ class RemoteTimerList(TimerEditList):
 		
 		self["timerlist"].hide()
 		
-		sCommand = "http://%s:%d/web/timerlist" % (self.ip,self.port)
+		sCommand = "%s/web/timerlist" % (self.http)
 
 		sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.downloadCallback).addErrback(self.downloadError)
 		
@@ -243,7 +242,7 @@ class RemoteTimerList(TimerEditList):
 			else:
 				tagset += " " + tag
 				
-		sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&repeated=%d&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend, t.repeated  )
+		sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&repeated=%d&deleteOldOnSave=1" % (self.http, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, disabled, t.justplay, t.servicereference, t.timebegin, t.timeend, t.repeated  )
 		
 		sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		
@@ -266,7 +265,7 @@ class RemoteTimerList(TimerEditList):
 		
 		t = self["timerlist"].getCurrent()
 		if t:
-			sCommand = "http://%s:%d/web/timerdelete?sRef=%s&begin=%s&end=%s" %(self.ip, self.port, t.servicereference, t.timebegin, t.timeend)
+			sCommand = "%s/web/timerdelete?sRef=%s&begin=%s&end=%s" %(self.http, t.servicereference, t.timebegin, t.timeend)
 			
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerDeleteCallback).addErrback(self.actionError)
 			
@@ -279,10 +278,7 @@ class RemoteTimerList(TimerEditList):
 		self.Locations = []
 		self.timer = timer
 		
-		ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
-		port = self.partnerboxentry.port.value
-		http_ = "%s:%d" % (ip,port)
-		getLocations(self, "http://" + http_ + "/web/getlocations", self.partnerboxentry, False, "read")
+		getLocations(self, "%s/web/getlocations" %(self.http), self.partnerboxentry, False, "read")
 		
 	def addTimerCallback(self):
 		from RemoteTimerEntry import RemoteTimerEntry
@@ -306,10 +302,7 @@ class RemoteTimerList(TimerEditList):
 			
 			self.Locations = []
 	
-			ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
-			port = self.partnerboxentry.port.value
-			http_ = "%s:%d" % (ip,port)
-			getLocations(self, "http://" + http_ + "/web/getlocations", self.partnerboxentry, False, "edit")
+			getLocations(self, "%s/web/getlocations" %(self.http), self.partnerboxentry, False, "edit")
 		
 	def	openEditCallback(self):
 		self.session.openWithCallback(self.finishedEdit, RemoteTimerEntry, self.currentTimer, self.Locations, self.partnerboxentry, self.E2TimerList, mode="edit")
@@ -328,7 +321,7 @@ class RemoteTimerList(TimerEditList):
 				else:
 					tagset += " " + tag			
 			
-			sCommand = "http://%s:%d/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&repeated=%d&deleteOldOnSave=1" % (self.ip, self.port, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld, t.repeated   )			
+			sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=%s&justplay=%s&channelOld=%s&beginOld=%s&endOld=%s&repeated=%d&deleteOldOnSave=1" % (self.http, t.servicereference, t.timebegin, t.timeend, urllib.quote(t.name), urllib.quote(t.description), urllib.quote(t.dirname), urllib.quote(tagset), t.afterEvent, t.eit, t.disabled, t.justplay, self.srefOld, self.timeBeginOld, self.timeEndOld, t.repeated   )			
 		
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 		else:
@@ -341,7 +334,7 @@ class RemoteTimerList(TimerEditList):
 	
 	def cleanupTimer(self, delete):
 		if delete:
-			sCommand = "http://%s:%d/web/timercleanup?cleanup=true" % (self.ip, self.port)
+			sCommand = "%s/web/timercleanup?cleanup=true" % (self.http)
 			
 			sendPartnerBoxWebCommand(sCommand, 10, self.username, self.password, self.webiftype).addCallback(self.timerChangeCallback).addErrback(self.actionError)
 			

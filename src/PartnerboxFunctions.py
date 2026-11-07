@@ -44,29 +44,22 @@ def url_parse(url, defaultPort=None):
 		port = int(port)
 	return scheme, host, port, path
 
-def getTimerType(refstr, beginTime, duration, eit, timer_list):
+def getTimerType(timer, beginTime, duration, eit):
+	endTime = beginTime + duration
+	if timer.eit == eit:
+		return True
 	pre = 1
 	post = 2
 	type = 0
-	endTime = beginTime + duration
-	for x in timer_list:
-		if x.servicereference.upper() == refstr.upper():
-			if x.eit == eit:
-				return True
-			beg = x.timebegin
-			end = x.timeend
-			if beginTime > beg and beginTime < end and endTime > end:
-				type |= pre
-			elif beginTime < beg and endTime > beg and endTime < end:
-				type |= post
-	if type == 0:
-		return True
-	elif type == pre:
-		return False
-	elif type == post:
-		return False
-	else:
-		return True
+	beg = timer.timebegin
+	end = timer.timeend
+	if beginTime > beg and beginTime < end and endTime > end:
+		type |= pre
+	elif beginTime < beg and endTime > beg and endTime < end:
+		type |= post
+	# pre only or post only = marginal overlap, suppress
+	# 0 (repeated timer) or pre|post = confirm
+	return type != pre and type != post
 
 def isInTimerList(begin, duration, service, eit, timer_list):
 	time_match = 0
@@ -101,7 +94,9 @@ def isInTimerList(begin, duration, service, eit, timer_list):
 					if time_match < diff:
 						time_match = diff
 			if time_match:
-				if getTimerType(serviceref, begin, duration, eit, timer_list):				
+				# we already have a single timer. So, let's use it instead of providing the full list again
+				#if getTimerType(serviceref, begin, duration, eit, timer_list):	
+				if getTimerType(x, begin, duration, eit):
 					timerentry = x
 				break
 	return timerentry
@@ -167,11 +162,9 @@ def FillE2TimerList(xmlstring, sreference = None):
 				go = True
 		
 		tags = []
-		if timer.findtext("e2tags") == "":
-			pass
-		else:
-			tagsList = timer.findtext("e2tags").encode("utf-8", 'ignore').split(" ")
-			for tag in tagsList:
+		tags_text = timer.findtext("e2tags", "")
+		if tags_text:
+			for tag in tags_text.encode("utf-8", 'ignore').split(" "):
 				tags.append(tag)
 				
 		if go:
@@ -278,9 +271,8 @@ def SetPartnerboxTimerlist(partnerboxentry = None, sreference = None):
 		password = partnerboxentry.password.value
 		username = "root"
 		CurrentIP = partnerboxentry.ip.value
-		ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-		port = partnerboxentry.port.value
-		sCommand = "http://%s:%d/web/timerlist" % (ip,port)
+		http = getBaseUrl(partnerboxentry)
+		sCommand = "%s/web/timerlist" %(http)
 		sendPartnerBoxWebCommand(sCommand, 3, username, password).addCallback(boundFunction(setTimerListCallback, sreference = sreference)).addErrback(setTimerListErrorCallbackError)
 		print "[RemoteEPGList] Getting timerlist data from %s..."%ip
 		
@@ -298,3 +290,12 @@ def getServiceRef(sreference):
 	service.setPath("")
 	service.setName("")
 	return service.toString()
+	
+def getBaseUrl(partnerboxentry = None):
+	if partnerboxentry is not None:
+		ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
+		port = partnerboxentry.port.value
+		http = "http://%s:%d" %(ip, port)
+		
+		return http
+	return None

@@ -51,7 +51,7 @@ from RemoteTimerEntry import RemoteTimerEntry, RemoteTimerInit
 from RemoteTimerList import RemoteTimerList
 from PartnerboxEPGSelection import Partnerbox_EPGSelectionInit
 
-from PartnerboxFunctions import E2Timer, FillE2TimerList, sendPartnerBoxWebCommand, isInTimerList
+from PartnerboxFunctions import E2Timer, FillE2TimerList, sendPartnerBoxWebCommand, isInTimerList, getBaseUrl
 
 from PartnerboxEPGList import Partnerbox_EPGListInit
 from PartnerboxSetup import PartnerboxSetup, PartnerboxEntriesListConfigScreen, initConfig
@@ -206,8 +206,10 @@ def Plugins(**kwargs):
 
 def FillLocationList(xmlstring):
 	Locations = []
-	try: root = xml.etree.cElementTree.fromstring(xmlstring)
-	except: Locations 
+	try:
+		root = xml.etree.cElementTree.fromstring(xmlstring)
+	except: 
+		return Locations 
 	for location in root.findall("e2location"):
 		Locations.append(location.text.encode("utf-8", 'ignore'))
 	for location in root.findall("e2simplexmlitem"):  # vorerst Kompatibilitaet zum alten Webinterface-Api aufrecht erhalten (e2simplexmlitem)
@@ -282,9 +284,7 @@ class RemoteTimerEPGList(Screen):
 			self.webiftype = partnerboxentry.webinterfacetype.value
 		except:
 			self.webiftype = "standard"
-		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-		port = partnerboxentry.port.value
-		self.http = "http://%s:%d" % (self.ip,port)
+		self.http = getBaseUrl(partnerboxentry)
 		self.useinternal = int(partnerboxentry.useinternal.value)
 		
 		self.url = self.http + "/web/epgservice?sRef=" + urllib.quote(self.servicereference.decode('utf8').encode('latin-1','ignore'))
@@ -382,7 +382,7 @@ class RemoteTimerEPGList(Screen):
 			self.ListCurrentIndex = 0
 		
 	def GreenPressed(self):
-		self.showAddTimer = False
+		#self.showAddTimer = False # dre: commented out as it doesn't make any sense
 		if self.showAddTimer:
 			if self.key_green_choice == self.ADD_TIMER:
 				self.getLocations()
@@ -599,7 +599,7 @@ class E2EPGList(MenuList):
 		self.selectionChanged_conn = instance.selectionChanged.connect(self.selectionChanged)
 	
 	def preWidgetRemove(self, instance):
-		self.sectionChanged_conn = None
+		self.selectionChanged_conn = None
 	
 	def getCurrentIndex(self):
 		return self.instance.getCurrentIndex()
@@ -770,9 +770,7 @@ class RemoteTimerEventView(Screen):
 			self.webiftype = partnerboxentry.webinterfacetype.value
 		except:
 			self.webiftype = "standard"
-		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-		port = partnerboxentry.port.value
-		self.http = "http://%s:%d" % (self.ip,port)
+		self.http = getBaseUrl(partnerboxentry)
 		self.useinternal = int(partnerboxentry.useinternal.value)
 
 	def startRun(self):
@@ -943,9 +941,8 @@ def setPartnerboxService(self, item, partnerboxentry):
 		else:
 			http = "http://%s:%d/%s" % (ip,port, item.servicereference)
 	service = eServiceReference(item.servicereference)
-	# only set a patch if service does not already have one and also not for markers
+	# only set a patch if service does not already have one
 	if not service.getPath() and not service.flags == 64:
-		# ensure to set reconnect flag
 		service.flags = 256
 		service.setPath(http)
 	servicename = item.servicename
@@ -989,9 +986,7 @@ class PartnerBouquetList(Screen):
 			self.webiftype = partnerboxentry.webinterfacetype.value
 		except:
 			self.webiftype = "standard"
-		ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-		port = partnerboxentry.port.value
-		self.http = "http://%s:%d" % (ip,port)
+		self.http = getBaseUrl(partnerboxentry)
 		self.playeronly = playeronly
 		if modeTV:
 			self.sRef = '1:7:1:0:0:0:0:0:0:0:(type == 1) || (type == 17) || (type == 22) || (type == 25) || (type == 31) || (type == 134) || (type == 195) FROM BOUQUET "bouquets.tv" ORDER BY bouquet'
@@ -1154,9 +1149,7 @@ class PartnerChannelList(Screen):
 			self.webiftype = partnerboxentry.webinterfacetype.value
 		except:
 			self.webiftype = "standard"
-		self.ip = "%d.%d.%d.%d" % tuple(partnerboxentry.ip.value)
-		self.port = partnerboxentry.port.value
-		self.http = "http://%s:%d" % (self.ip,self.port)
+		self.http = getBaseUrl(partnerboxentry)
 		self.ChannelListCurrentIndex = 0
 		self.mode = self.REMOTE_TIMER_MODE
 

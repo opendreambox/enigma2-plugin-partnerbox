@@ -21,8 +21,9 @@ from Screens.Screen import Screen
 import Screens.ChannelSelection
 from ServiceReference import ServiceReference
 from Components.config import config, ConfigSelection, ConfigText, ConfigSubList, ConfigDateTime, ConfigClock, ConfigYesNo, getConfigListEntry
-from Components.ActionMap import NumberActionMap
+from Components.ActionMap import NumberActionMap, ActionMap
 from Components.ConfigList import ConfigListScreen
+from Components.SelectionList import SelectionList, SelectionEntryComponent
 from Components.Label import Label
 from Components.Pixmap import Pixmap
 from RecordTimer import AFTEREVENT
@@ -37,11 +38,36 @@ import urllib
 
 import xml.etree.cElementTree
 
-from PartnerboxFunctions import sendPartnerBoxWebCommand, getServiceRef, SetPartnerboxTimerlist
+from PartnerboxFunctions import sendPartnerBoxWebCommand, getServiceRef, SetPartnerboxTimerlist, getBaseUrl
 import PartnerboxFunctions as partnerboxfunctions
 from time import localtime
 
 sz_w = getDesktop(0).size().width()
+
+class RemoteTagSelection(Screen):
+	skin = """
+		<screen name="RemoteTagSelection" position="center,center" size="600,450" title="Remote tags">
+			<widget name="list" position="10,10" size="580,380" scrollbarMode="showOnDemand" />
+			<widget name="key_green" position="10,400" size="200,40" font="Regular;20" halign="center" valign="center" backgroundColor="#1f771f" />
+		</screen>"""
+
+	def __init__(self, session, available, selected):
+		Screen.__init__(self, session)
+		tags = list(available)
+		for t in selected:
+			if t not in tags:
+				tags.append(t)
+		tags.sort()
+		self["list"] = SelectionList([SelectionEntryComponent(t, t, i, t in selected) for i, t in enumerate(tags)])
+		self["key_green"] = Label(_("Save"))
+		self["actions"] = ActionMap(["OkCancelActions", "ColorActions"], {
+			"ok": self["list"].toggleSelection,
+			"green": self.keySave,
+			"cancel": self.close,
+		}, -1)
+
+	def keySave(self):
+		self.close([x[1] for x in self["list"].getSelectionsList()])
 
 class RemoteTimerEntry(TimerEntry):
 	if sz_w == 1920:
@@ -93,14 +119,13 @@ class RemoteTimerEntry(TimerEntry):
 			}[self.timer.afterEvent]
 		
 		default = self.timer.dirname
-		self.Locations = Locations
-		if default == "None":
-			if self.Locations:
-				default = self.Locations[0]
-			else:
-				default = "N/A"
+		if isUnsetDirname(default):
+			default = getattr(self, "defaultLocation", None)
+			if not default:
+				default = self.Locations and self.Locations[0] or "N/A"
+			self.timer.dirname = default
 		if default not in self.Locations:
-			self.Locations.append(default)		
+			self.Locations.append(default)	
 
 		self.onLayoutFinish.append(self.setWindowTitle)	
 	
@@ -186,6 +211,7 @@ def RemoteTimerConfig(self):
 def getLocations(self, url, partnerboxentry, check, mode="new"):
 	try:
 		self.partnerboxentry = partnerboxentry
+		self.defaultLocation = None
 		sendPartnerBoxWebCommand(url, 3, "root", self.partnerboxentry.password.value, self.partnerboxentry.webinterfacetype.value).addCallback(boundFunction(getLocationsCallback,self, check = check, mode = mode)).addErrback(boundFunction(getLocationsCallbackError,self))
 	except Exception, e:
 		print e
@@ -197,38 +223,85 @@ def getLocationsCallbackError(self, error):
 def getLocationsCallback(self, xmlstring, check = False, mode = "new"):
 	# initialise self.Locations as it is for any unknown reason populated with the value None
 	self.Locations = []
-	try: root = xml.etree.cElementTree.fromstring(xmlstring)
-	except: return 
-	for location in root.findall("e2location"):
-		add = True
-		if check:
-			add = location.text.encode("utf-8", 'ignore') not in self.Locations
-		if add:
-			self.Locations.append(location.text.encode("utf-8", 'ignore'))
-	for location in root.findall("e2simplexmlitem"):  # vorerst Kompatibilitaet zum alten Webinterface-Api aufrecht erhalten (e2simplexmlitem)
-		add = True
-		if check:
-			add = location.text.encode("utf-8", 'ignore') not in self.Locations
-		if add:
-			self.Locations.append(location.text.encode("utf-8", 'ignore'))
+	try:
+		root = xml.etree.cElementTree.fromstring(xmlstring)
+	except:
+		root = None
+
+	if root is not None:
+		# e2simplexmlitem: compatibility with the old webinterface API
+		for location in root.findall("e2location") + root.findall("e2simplexmlitem"):
+			if location.text:
+				loc = location.text.encode("utf-8", 'ignore')
+				if loc not in self.Locations:
+					self.Locations.append(loc)
+	getDefaultLocation(self, self.partnerboxentry, mode)
 		
-	# new as everything is async now	
-	if len(self.Locations) == 0:
-		ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
-		port = self.partnerboxentry.port.value
-		http_ = "%s:%d" % (ip,port)
-		
-		getLocations(self, "http://" + http_ + "/web/getcurrlocation", self.partnerboxentry, True)
+def getDefaultLocation(self, partnerboxentry, mode):
+	try:
+		sCommand = "%s/web/getcurrlocation" % getBaseUrl(partnerboxentry)
+		sendPartnerBoxWebCommand(sCommand, 3, "root", partnerboxentry.password.value, partnerboxentry.webinterfacetype.value).addCallbacks(
+			boundFunction(getDefaultLocationCallback, self, mode), boundFunction(getDefaultLocationError, self, mode))
+	except Exception, e:
+		print e
+		finishLocations(self, mode)
+
+def getDefaultLocationCallback(self, mode, xmlstring):
+	loc = None
+	try:
+		root = xml.etree.cElementTree.fromstring(xmlstring)
+		loc = root.findtext("e2location") or root.findtext("e2simplexmlitem")
+	except:
+		pass
+	if loc:
+		loc = loc.encode("utf-8", "ignore")
+		self.defaultLocation = loc
+		if loc in self.Locations:
+			self.Locations.remove(loc)
+		self.Locations.insert(0, loc)	# default first, so Locations[0] is the default everywhere
+	finishLocations(self, mode)
+
+def getDefaultLocationError(self, mode, error):
+	print "getDefaultLocationError", error.getErrorMessage()
+	finishLocations(self, mode)	# continue with what getlocations returned
+
+def finishLocations(self, mode):
+	# step 3: the former tail of getLocationsCallback
+	if mode == "new":
+		RemoteTimercreateConfig(self)
+		RemoteTimerCreateSetup(self, "config")
+	elif mode == "read":
+		from plugin import RemoteTimerList
+		RemoteTimerList.addTimerCallback(self)
 	else:
-		if mode == "new":
-			RemoteTimercreateConfig(self)
-			RemoteTimerCreateSetup(self,"config")
-		elif mode == "read":
-			from plugin import RemoteTimerList
-			RemoteTimerList.addTimerCallback(self)
-		else:
-			from plugin import RemoteTimerList
-			RemoteTimerList.openEditCallback(self)
+		from plugin import RemoteTimerList
+		RemoteTimerList.openEditCallback(self)
+
+def isUnsetDirname(dirname):
+	return not dirname or dirname in ("None", "N/A")
+
+def getTags(self, partnerboxentry = None):
+	if partnerboxentry is None:
+		return
+	try:
+		http = getBaseUrl(partnerboxentry)
+		sCommand = "%s/web/gettags" %(http)
+		sendPartnerBoxWebCommand(sCommand, 3, "root", partnerboxentry.password.value, partnerboxentry.webinterfacetype.value).addCallback(boundFunction(getTagsCallback,self)).addErrback(boundFunction(getTagsCallbackError,self))
+	except Exception,e: print str(e)
+	
+def getTagsCallback(self, xmlstring):
+	self.tags = []
+	try:
+		root = xml.etree.cElementTree.fromstring(xmlstring)
+	except:
+		return
+
+	for tag in root.findall("e2tag"):
+		self.tags.append(tag.text.encode('utf-8', 'ignore'))
+		
+def getTagsCallbackError(self, error):
+	msg = self.session.open(MessageBox, error.getErrorMessage(), MessageBox.TYPE_ERROR)
+	msg.setTitle(_("Partnerbox"))
 		
 def createRemoteTimerSetup(self, widget):
 	baseTimerEntrySetup(self, widget)
@@ -239,13 +312,11 @@ def createRemoteTimerSetup(self, widget):
 	
 def RemoteTimerkeyLeft(self):
 	if int(self.timerentry_remote.value) != 0:
-		if self["config"].getCurrent() in (self.channelEntry, self.tagsSet):
-			try:
-				timerlist = self.E2TimerList
-			except:
-				timerlist = []
-			from plugin import PartnerBouquetList
-			self.session.openWithCallback(boundFunction(PartnerBouquetListCallback,self), PartnerBouquetList, timerlist, self.entryguilist[int(self.timerentry_remote.value)][2], 0, 0)
+		cur = self["config"].getCurrent()
+		if cur and cur == self.channelEntry:
+			openPartnerBouquetList(self)
+		elif cur and cur == self.tagsSet:
+			openRemoteTagSelection(self)
 		else:
 			ConfigListScreen.keyLeft(self)
 			RemoteTimernewConfig(self)
@@ -254,13 +325,11 @@ def RemoteTimerkeyLeft(self):
 
 def RemoteTimerkeyRight(self):
 	if int(self.timerentry_remote.value) != 0:
-		if self["config"].getCurrent() in (self.channelEntry, self.tagsSet):
-			try:
-				timerlist = self.E2TimerList
-			except:
-				timerlist = []
-			from plugin import PartnerBouquetList
-			self.session.openWithCallback(boundFunction(PartnerBouquetListCallback,self), PartnerBouquetList, timerlist, self.entryguilist[int(self.timerentry_remote.value)][2], 0, 0)
+		cur = self["config"].getCurrent()
+		if cur and cur == self.channelEntry:
+			openPartnerBouquetList(self)
+		elif cur and cur == self.tagsSet:
+			openRemoteTagSelection(self)
 		else:
 			ConfigListScreen.keyRight(self)
 			RemoteTimernewConfig(self)
@@ -269,18 +338,46 @@ def RemoteTimerkeyRight(self):
 
 def RemoteTimerkeySelect(self):
 	if int(self.timerentry_remote.value) != 0:
-		RemoteTimerGo(self)
+		cur = self["config"].getCurrent()
+		if cur and cur == self.channelEntry:
+			openPartnerBouquetList(self)
+		elif cur and cur == self.tagsSet:
+			openRemoteTagSelection(self)
+		else:
+			RemoteTimerGo(self)
 	else:
 		baseTimerkeySelect(self)
-	
+
+def openPartnerBouquetList(self):
+	try:
+		timerlist = self.E2TimerList
+	except:
+		timerlist = []
+	from plugin import PartnerboxBouquetList
+	self.session.openWithCallback(boundFunction(self.PartnerBouquetListCallback), PartnerboxBouquetList, self.entryguilist[int(self.timerentry_remote.value)][2], 0, 0)
+
+def openRemoteTagSelection(self):
+	available = getattr(self, "tags", None)
+	if available is None:
+		self.session.open(MessageBox, _("Tags are still being loaded from the partnerbox."), MessageBox.TYPE_INFO, timeout=5)
+		return
+	self.session.openWithCallback(boundFunction(RemoteTagSelectionCallback, self), RemoteTagSelection, available, self.timerentry_tags)	
+
+def RemoteTagSelectionCallback(self, ret):
+	if ret is None:
+		return
+	self.timerentry_tags = ret
+	self.timerentry_tagsset.setChoices([ret and " ".join(ret) or "None"])
+	self["config"].invalidate(self.tagsSet)
+
 def RemoteTimernewConfig(self):
 	if self["config"].getCurrent() == self.timerRemoteEntry:
 		if int(self.timerentry_remote.value) != 0:
-			ip = "%d.%d.%d.%d" % tuple(self.entryguilist[int(self.timerentry_remote.value)][2].ip.value)
-			port = self.entryguilist[int(self.timerentry_remote.value)][2].port.value
-			http_ = "%s:%d" % (ip,port)
+			http = getBaseUrl(self.entryguilist[int(self.timerentry_remote.value)][2])
 			self.Locations = []
-			getLocations(self, "http://" + http_ + "/web/getlocations", self.entryguilist[int(self.timerentry_remote.value)][2], False)
+			getLocations(self, http + "/web/getlocations", self.entryguilist[int(self.timerentry_remote.value)][2], False)
+			self.tags = []
+			getTags(self, self.entryguilist[int(self.timerentry_remote.value)][2])
 		else:
 			baseTimercreateConfig(self)
 			createRemoteTimerSetup(self, "config")
@@ -373,15 +470,15 @@ def RemoteTimercreateConfig(self):
 	self.timerentry_showendtime = ConfigSelection(default = ((self.timer.end - self.timer.begin) > 4), choices = [(True, _("yes")), (False, _("no"))])	
 
 	default = self.timer.dirname
-	if not default:
-		if self.Locations:
-			default = self.Locations[0]
-		else:
-			default = "N/A"
-	if default and default not in self.Locations:
+	if isUnsetDirname(default):
+		default = getattr(self, "defaultLocation", None)
+		if not default:
+			default = self.Locations and self.Locations[0] or "N/A"
+		self.timer.dirname = default
+	if default not in self.Locations:
 		self.Locations.append(default)
-		
 	self.timerentry_dirname = ConfigSelection(default = default, choices = self.Locations)
+
 	repeatedbegin = begin
 	if self.timer.repeatedbegindate > 0:
 		repeatedbegin = self.timer.repeatedbegindate
@@ -492,8 +589,8 @@ def RemoteTimerGo(self):
 		http = "http://%s:%d" % (ip,port)
 
 		name = self.timerentry_name.value
-		self.timer.tags = self.timerentry_tags
-		if self.timerentry_justplay.value == "zap":
+		tags = urllib.quote(" ".join(self.timerentry_tags))
+		if self.timerentry_justplay.value == "zap" or self.timerentry_justplay.value == "1":
 			justplay = 1
 			dirname = ""
 		else:
@@ -536,17 +633,20 @@ def RemoteTimerGo(self):
 				self.mode = "add"
 	
 			if self.mode == "add":
-				sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&tags=%s&eit=%s&justplay=%d&afterevent=%s&repeated=%d" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname),urllib.quote(self.timerentry_tagsset.value), self.timer.eit, justplay,afterevent, self.timer.repeated)
+				sCommand = "%s/web/timeradd?sRef=%s&begin=%d&end=%d&name=%s&description=%s&dirname=%s&tags=%s&eit=%s&justplay=%d&afterevent=%s&repeated=%d" % (http, service_ref,begin,end,urllib.quote(name),urllib.quote(descr),urllib.quote(dirname), tags, self.timer.eit, justplay,afterevent, self.timer.repeated)
 			else: # edit
-				sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=0&justplay=%s&repeated=%d&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (http, service_ref, begin, end, urllib.quote(name), urllib.quote(descr), urllib.quote(dirname), urllib.quote(self.timerentry_tagsset.value), afterevent, self.eit, justplay, self.timer.repeated, self.srefOld, self.timeBeginOld, self.timeEndOld   )
+				sCommand = "%s/web/timerchange?sRef=%s&begin=%s&end=%s&name=%s&description=%s&dirname=%s&tags=%s&afterevent=%s&eit=%s&disabled=0&justplay=%s&repeated=%d&channelOld=%s&beginOld=%s&endOld=%s&deleteOldOnSave=1" % (http, service_ref, begin, end, urllib.quote(name), urllib.quote(descr), urllib.quote(dirname), tags, afterevent, self.eit, justplay, self.timer.repeated, self.srefOld, self.timeBeginOld, self.timeEndOld   )
 			
 			sendPartnerBoxWebCommand(sCommand, 3, "root", str(self.entryguilist[int(self.timerentry_remote.value)][2].password.value), self.entryguilist[int(self.timerentry_remote.value)][2].webinterfacetype.value).addCallback(boundFunction(AddTimerE2Callback,self, self.session)).addErrback(boundFunction(AddTimerError,self,self.session))
 			
 
 def AddTimerE2Callback(self, session, answer):
 	text = ""
-	try: root = xml.etree.cElementTree.fromstring(answer)
-	except: pass
+	try:
+		root = xml.etree.cElementTree.fromstring(answer)
+	except Exception:
+		session.open(MessageBox, _("Partnerbox: invalid response"), MessageBox.TYPE_INFO, timeout=10)
+		return
 	statetext = root.findtext("e2statetext")
 	state = root.findtext("e2state")
 	if statetext:

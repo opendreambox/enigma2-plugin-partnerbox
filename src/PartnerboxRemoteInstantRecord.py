@@ -121,11 +121,10 @@ def getEPGNow(self, session, what, partnerboxentry):
 		self.session.open(MessageBox, _("Partnerbox Serverbox does not support recording"), MessageBox.TYPE_ERROR, timeout=5)	
 
 def getEPGNowCallback(self, result):
-	text = ""
 	try:
 		root = xml.etree.cElementTree.fromstring(result)
-	except:
-		pass
+	except Exception:
+		return
 	
 	event = root.find("e2event", None)
 	if event is not None:
@@ -148,7 +147,8 @@ def RemoteInstantRecordCallback(self, result):
 	try:
 		root = xml.etree.cElementTree.fromstring(result)
 	except:
-		pass
+		self.session.open(MessageBox, _("Partnerbox: invalid response"), MessageBox.TYPE_ERROR, timeout=5)
+		return
 	statetext = root.findtext("e2statetext")
 	state = root.findtext("e2state")
 	if statetext:

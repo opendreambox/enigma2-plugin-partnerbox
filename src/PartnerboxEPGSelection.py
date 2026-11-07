@@ -24,7 +24,7 @@ from PartnerboxSetup import PartnerboxEntriesListConfigScreen
 from Screens.EpgSelection import EPGSelection
 from Components.EpgList import EPG_TYPE_SINGLE, EPG_TYPE_SIMILAR, EPG_TYPE_MULTI
 from Tools.BoundFunction import boundFunction
-from PartnerboxFunctions import SetPartnerboxTimerlist, isInTimerList, sendPartnerBoxWebCommand, FillE2TimerList
+from PartnerboxFunctions import SetPartnerboxTimerlist, isInTimerList, sendPartnerBoxWebCommand, FillE2TimerList, getBaseUrl
 import PartnerboxFunctions as partnerboxfunctions
 from enigma import eServiceReference, eServiceCenter
 
@@ -125,9 +125,7 @@ def Partnerbox_onCreate(self):
 
 def GetPartnerboxTimerlist(self):
 	if self.partnerboxentry is not None:
-		ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
-		port = self.partnerboxentry.port.value
-		http = "http://%s:%d" % (ip,port)
+		http = getBaseUrl(self.partnerboxentry)
 		sCommand = http + "/web/timerlist"
 		sendPartnerBoxWebCommand(sCommand, 3, "root", self.partnerboxentry.password.value, self.partnerboxentry.webinterfacetype.value).addCallback(boundFunction(self.GetPartnerboxTimerlistCallback)).addErrback(boundFunction(self.GetPartnerboxTimerlistCallbackError))
 
@@ -144,8 +142,10 @@ def GetPartnerboxTimerlistCallback(self, result):
 def GetPartnerboxTimerlistCallbackError(self, error = None):
 	if error is not None:
 		print str(error.getErrorMessage())
-		msg = self.session.open(MessageBox, error.getErrorMessage(), MessageBox.TYPE_ERROR)
-		msg.setTitle(_("Partnerbox"))
+		# don't show error message in EPG when remote box is down
+		if error.getErrorMessage() != "An error occurred while connecting: 113: No route to host.":
+			msg = self.session.open(MessageBox, error.getErrorMessage(), MessageBox.TYPE_ERROR)
+			msg.setTitle(_("Partnerbox"))
 
 def CheckRemoteTimer(self):
 	if self.key_green_choice != self.REMOVE_TIMER:
@@ -162,9 +162,7 @@ def CheckRemoteTimer(self):
 
 def DeleteTimerConfirmed (self, timerentry, answer):
 	if answer:
-		ip = "%d.%d.%d.%d" % tuple(self.partnerboxentry.ip.value)
-		port = self.partnerboxentry.port.value
-		http = "http://%s:%d" % (ip,port)
+		http = getBaseUrl(self.partnerboxentry)
 		sCommand = http + "/web/timerdelete?sRef=" + timerentry.servicereference + "&begin=" + ("%s"%(timerentry.timebegin)) + "&end=" +("%s"%(timerentry.timeend))
 		sendPartnerBoxWebCommand(sCommand, 3, "root", self.partnerboxentry.password.value, self.partnerboxentry.webinterfacetype.value).addCallback(self.DeleteTimerCallback).addErrback(boundFunction(DeleteTimerCallbackError,self))
 
